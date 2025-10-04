@@ -28,7 +28,7 @@ export default function AdminLogin() {
       if (isAuthenticated && userType === 'admin') {
         toast.success('Already logged in as admin! Redirecting to admin dashboard...');
         await new Promise(resolve => setTimeout(resolve, 1000));  
-        router.push('/admin/dashboard');
+        router.push('/admin/calendar');
       }
     };
     checkAuth();
@@ -108,7 +108,7 @@ export default function AdminLogin() {
       await new Promise(resolve => setTimeout(resolve, 1000));
       
       // Navigate to admin dashboard
-      router.push('/admin/dashboard');
+      router.push('/admin/calendar');
       
     } catch (error) {
       console.error('Admin login failed:', error);

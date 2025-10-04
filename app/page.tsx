@@ -22,7 +22,7 @@ export default function HomePage() {
     // Fixed: 5-second delay before redirect
     const redirectTimer = setTimeout(() => {
       if (isAuthenticated && userType === "admin") {
-        router.push("/admin/dashboard");
+        router.push("/admin/calendar");
       } else {
         router.push("/auth/admin/login");
       }

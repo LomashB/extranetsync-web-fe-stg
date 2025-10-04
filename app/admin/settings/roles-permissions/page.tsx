@@ -213,7 +213,20 @@ export default function RolesPermissionsPage() {
       if (response.data.STATUS === 1) {
         toast.success('Role created successfully');
         setIsCreateRoleModalOpen(false);
-        resetForm();
+        
+        // Set the newly created role and open permission modal
+        const newRole = response.data.RESULT;
+        console.log('New role created:', newRole); // Debug log
+        setSelectedRole(newRole);
+        setSelectedPermissions([]); // Start with no permissions selected
+        setIsPermissionModalOpen(true);
+        
+        // Reset form data but keep selectedRole for permission modal
+        setRoleFormData({
+          name: '',
+          description: '',
+          is_active: true
+        });
         fetchRoles();
       } else {
         throw new Error(response.data.MESSAGE || 'Failed to create role');
@@ -336,16 +349,29 @@ export default function RolesPermissionsPage() {
   };
 
   const handleSavePermissions = async () => {
-    if (!selectedRole) return;
+    if (!selectedRole) {
+      console.error('No selected role found');
+      toast.error('No role selected');
+      return;
+    }
+    
+    console.log('Saving permissions for role:', selectedRole);
+    console.log('Selected permissions:', selectedPermissions);
+    
     setIsSavingPermissions(true);
     try {
       const response = await axios.post('admin/assign-permission-to-role-inBulk', {
         role_id: selectedRole._id,
         permission_ids: selectedPermissions
       });
+      
+      console.log('Save permissions response:', response.data);
+      
       if (response.data.STATUS === 1) {
         toast.success('Permissions updated successfully');
         setIsPermissionModalOpen(false);
+        setSelectedRole(null);
+        setSelectedPermissions([]);
         fetchRoles();
       } else {
         throw new Error(response.data.MESSAGE || 'Failed to update permissions');

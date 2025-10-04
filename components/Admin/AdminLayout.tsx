@@ -3,25 +3,7 @@
 import React, { useState, ReactNode } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import {
-  LayoutDashboard,
-  Menu,
-  ChevronRight,
-  LogOut,
-  Building,
-  Users,
-  Settings,
-  Home,
-  BarChart3,
-  Calendar,
-  Database,
-  Globe,
-  Shield,
-  UserCircle2,
-  Users2,
-  ChevronDown,
-  X,
-} from "lucide-react";
+import { Home, Building, Globe, Database, Calendar, BarChart3, Link as LinkIcon, Settings, Users2, Shield, UserCircle, Menu, ChevronDown, X, LogOut, MapPin } from "lucide-react";
 import { useAuth } from "../../context/AuthContext";
 import UnauthorizedModal from "./UnauthorizedModel";
 import { useLoading } from "../../context/LoadingContext";
@@ -80,29 +62,17 @@ interface AdminUser {
   __v: number;
 }
 
-// Updated menu items for Extranetsync hotel channel management
-const menuItems: MenuItem[] = [
-  { href: "/admin/dashboard", label: "Dashboard", icon: Home },
+const menuItems = [
+  { href: "/admin/calendar", label: "Calendar", icon: Calendar },
   { href: "/admin/properties", label: "Properties", icon: Building },
-  { href: "/admin/channels", label: "Channel Management", icon: Globe },
-  { href: "/admin/inventory", label: "Inventory & Rates", icon: Database },
-  { href: "/admin/reservations", label: "Reservations", icon: Calendar },
-  { href: "/admin/analytics", label: "Analytics", icon: BarChart3 },
-  {
+  { href: "/admin/room-mapping", label: "Room Mapping", icon: LinkIcon }, 
+  { 
     label: "Settings",
     icon: Settings,
     children: [
-      {
-        href: "/admin/settings/users",
-        label: "User Management", 
-        icon: Users2,
-      },
-      {
-        href: "/admin/settings/roles-permissions",
-        label: "Roles & Permissions",
-        icon: Shield,
-      },
-      { href: "/admin/settings/profile", label: "Profile", icon: UserCircle2 },
+      { href: "/admin/settings/users", label: "User Management", icon: Users2 },
+      { href: "/admin/settings/roles-permissions", label: "Roles & Permissions", icon: Shield },
+      { href: "/admin/settings/profile", label: "Profile", icon: UserCircle },
     ],
   },
 ];
