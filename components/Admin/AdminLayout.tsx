@@ -3,7 +3,7 @@
 import React, { useState, ReactNode } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Home, Building, Globe, Database, Calendar, BarChart3, Link as LinkIcon, Settings, Users2, Shield, UserCircle, Menu, ChevronDown, X, LogOut, MapPin } from "lucide-react";
+import { Home, Building, Globe, Database, Calendar, BarChart3, Link as LinkIcon, Settings, Users2, Shield, UserCircle, Menu, ChevronDown, X, LogOut, MapPin, FileText } from "lucide-react";
 import { useAuth } from "../../context/AuthContext";
 import UnauthorizedModal from "./UnauthorizedModel";
 import { useLoading } from "../../context/LoadingContext";
@@ -75,6 +75,7 @@ const menuItems = [
       { href: "/admin/settings/profile", label: "Profile", icon: UserCircle },
     ],
   },
+  { href: "/admin/logs", label: "Logs", icon: FileText },
 ];
 
 // Mobile sidebar content
