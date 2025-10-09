@@ -3,7 +3,7 @@
 import React, { useState, ReactNode } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Home, Building, Globe, Database, Calendar, BarChart3, Link as LinkIcon, Settings, Users2, Shield, UserCircle, Menu, ChevronDown, X, LogOut, MapPin, FileText } from "lucide-react";
+import { Home, Building, Globe, Database, Calendar, BarChart3, Link as LinkIcon, Settings, Users2, Shield, UserCircle, Menu, ChevronDown, X, LogOut, MapPin, FileText, Package } from "lucide-react";
 import { useAuth } from "../../context/AuthContext";
 import UnauthorizedModal from "./UnauthorizedModel";
 import { useLoading } from "../../context/LoadingContext";
@@ -65,7 +65,8 @@ interface AdminUser {
 const menuItems = [
   { href: "/admin/calendar", label: "Calendar", icon: Calendar },
   { href: "/admin/properties", label: "Properties", icon: Building },
-  { href: "/admin/room-mapping", label: "Room Mapping", icon: LinkIcon }, 
+  { href: "/admin/room-mapping", label: "Room Mapping", icon: LinkIcon },
+  { href: "/admin/bookings", label: "Bookings", icon: Package },
   { 
     label: "Settings",
     icon: Settings,
