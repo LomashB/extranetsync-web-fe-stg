@@ -445,7 +445,7 @@ const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
         <div className="flex-1 overflow-hidden">
           <div className="h-full bg-black">
             <div className="bg-[#f6f6f7] h-full rounded-tl-xl md:rounded-tl-3xl rounded-tr-xl md:rounded-tr-none overflow-y-auto [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-track]:bg-[#f6f6f7] [&::-webkit-scrollbar-thumb]:bg-gray-300 hover:[&::-webkit-scrollbar-thumb]:bg-gray-400 [&::-webkit-scrollbar-thumb]:rounded-full">
-              <div className="p-2 lg:p-6">
+              <div className="p-2">
                 {children}
                 <UnauthorizedModal useNewDesign={true} />
               </div>

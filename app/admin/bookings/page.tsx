@@ -417,16 +417,19 @@ export default function BookingsPage() {
     <PageTransitionWrapper>
       <div className="mx-auto space-y-6 p-2 md:p-4">
         {/* Header */}
-        <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
-          <div>
-            <h1 className="text-2xl font-semibold text-gray-900">Bookings</h1>
-            <p className="mt-1 text-sm text-gray-600">
-              Manage and track bookings across Agoda and HyperGuest platforms
-            </p>
-          </div>
+        <div className="flex flex-col gap-4">
+          <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+            <div>
+              <h1 className="text-2xl font-semibold text-gray-900">Bookings</h1>
+              <p className="mt-1 text-sm text-gray-600">
+                Manage and track bookings across Agoda and HyperGuest platforms
+              </p>
+            </div>
 
-          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
-            <div className="min-w-0 flex-1 sm:min-w-[300px]">
+              
+          {/* Search and Filters Row */}
+          <div className="flex flex-col md:flex-row gap-2">
+            <div className="flex-1 min-w-0">
               <SearchInput
                 placeholder="Search by booking ID, guest name, or property..."
                 value={searchTerm}
@@ -435,16 +438,45 @@ export default function BookingsPage() {
               />
             </div>
 
-            <Button
-              variant="secondary"
-              leftIcon={<RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />}
-              onClick={handleRefresh}
-              disabled={loading}
-              className="flex-shrink-0"
-            >
-              Refresh
-            </Button>
+         
+
+            <div className="flex flex-col sm:flex-row gap-3">
+              <div className="min-w-[160px]">
+                <select
+                  value={platformFilter}
+                  onChange={(e) => setPlatformFilter(e.target.value as any)}
+                  className="w-full h-10 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
+                >
+                  <option value="all">All Platforms</option>
+                  <option value="agoda">Agoda</option>
+                  <option value="hyperguest">HyperGuest</option>
+                </select>
+              </div>
+
+              <div className="min-w-[160px]">
+                <select
+                  value={statusFilter}
+                  onChange={(e) => setStatusFilter(e.target.value as any)}
+                  className="w-full h-10 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
+                >
+                  <option value="all">All Status</option>
+                  <option value="active">Active</option>
+                  <option value="cancelled">Cancelled</option>
+                </select>
+              </div>
+
+              <Button
+                variant="secondary"
+                leftIcon={<RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />}
+                onClick={handleRefresh}
+                disabled={loading}
+                className="flex-shrink-0 ml-0"
+              >
+              </Button>
+            </div>
           </div>
+          </div>
+
         </div>
 
         {/* Stats Cards */}
@@ -501,43 +533,6 @@ export default function BookingsPage() {
             </div>
           </div>
         )}
-
-        {/* Filters */}
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
-          <div className="flex flex-col md:flex-row gap-4">
-            <div className="flex-1">
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                <Filter className="h-4 w-4 inline mr-1" />
-                Platform
-              </label>
-              <select
-                value={platformFilter}
-                onChange={(e) => setPlatformFilter(e.target.value as any)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              >
-                <option value="all">All Platforms</option>
-                <option value="agoda">Agoda</option>
-                <option value="hyperguest">HyperGuest</option>
-              </select>
-            </div>
-
-            <div className="flex-1">
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                <Filter className="h-4 w-4 inline mr-1" />
-                Status
-              </label>
-              <select
-                value={statusFilter}
-                onChange={(e) => setStatusFilter(e.target.value as any)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              >
-                <option value="all">All Status</option>
-                <option value="active">Active</option>
-                <option value="cancelled">Cancelled</option>
-              </select>
-            </div>
-          </div>
-        </div>
 
         {/* Bookings Table */}
         <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
