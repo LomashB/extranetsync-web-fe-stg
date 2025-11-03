@@ -422,10 +422,6 @@ export default function PropertyManagement() {
           toast.error('Agoda Property ID is required');
           return;
         }
-        if (!propertyForm.hyperguest_property_id) {
-          toast.error('HyperGuest Property ID is required');
-          return;
-        }
         setCurrentStep(SetupStep.AGODA_FETCH);
         break;
         
@@ -449,7 +445,12 @@ export default function PropertyManagement() {
       case SetupStep.AGODA_PERCENTAGE:
         const percentageUpdated = await updateAgodaPercentage(propertyForm.agoda_property_id, agodaPercentage);
         if (percentageUpdated) {
-          setCurrentStep(SetupStep.HYPERGUEST_FETCH);
+          // Skip HyperGuest steps if property ID not provided
+          if (propertyForm.hyperguest_property_id.trim()) {
+            setCurrentStep(SetupStep.HYPERGUEST_FETCH);
+          } else {
+            setCurrentStep(SetupStep.OTA_CONFIG);
+          }
         }
         break;
         
@@ -753,10 +754,13 @@ export default function PropertyManagement() {
                           Agoda
                         </span>
                       )}
-                      {property.hyperguest_enabled && (
+                      {property.hyperguest_enabled && property.hyperguest_property_code && (
                         <span className="inline-flex items-center px-2 py-1 rounded text-xs font-medium bg-gray-100 text-gray-800">
                           HyperGuest
                         </span>
+                      )}
+                      {!property.agoda_enabled && !property.hyperguest_enabled && (
+                        <span className="text-sm text-gray-400">No platforms</span>
                       )}
                     </div>
                   </td>
@@ -857,7 +861,7 @@ export default function PropertyManagement() {
               <div>
                 <h3 className="text-lg font-medium text-gray-900 mb-2">Enter Property IDs</h3>
                 <p className="text-sm text-gray-600 mb-4">
-                  Provide the property IDs for both OTA platforms. Both Agoda and HyperGuest are required for property configuration.
+                  Provide the property ID for Agoda (required). HyperGuest property ID is optional.
                 </p>
               </div>
               
@@ -878,14 +882,13 @@ export default function PropertyManagement() {
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   <Globe className="h-4 w-4 inline mr-1" />
-                  HyperGuest Property ID <span className="text-red-500">*</span>
+                  HyperGuest Property ID <span className="text-gray-400 text-xs">(Optional)</span>
                 </label>
                 <Input
                   type="text"
                   value={propertyForm.hyperguest_property_id}
                   onChange={(e) => setPropertyForm({ ...propertyForm, hyperguest_property_id: e.target.value })}
-                  placeholder="Enter HyperGuest property ID"
-                  required
+                  placeholder="Enter HyperGuest property ID (optional)"
                 />
               </div>
             </div>
@@ -1205,13 +1208,15 @@ export default function PropertyManagement() {
                   <span className="text-sm text-gray-500">{propertyForm.agoda_property_id}</span>
                 </div>
                 
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center">
-                    <CheckCircle className="h-5 w-5 text-gray-700 mr-2" />
-                    <span className="font-medium">HyperGuest Integration</span>
+                {propertyForm.hyperguest_property_id && (
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center">
+                      <CheckCircle className="h-5 w-5 text-gray-700 mr-2" />
+                      <span className="font-medium">HyperGuest Integration</span>
+                    </div>
+                    <span className="text-sm text-gray-500">{propertyForm.hyperguest_property_id}</span>
                   </div>
-                  <span className="text-sm text-gray-500">{propertyForm.hyperguest_property_id}</span>
-                </div>
+                )}
               </div>
             </div>
           )}
@@ -1232,10 +1237,12 @@ export default function PropertyManagement() {
                     <span className="text-sm font-medium text-gray-700">Agoda Property:</span>
                     <span className="text-sm text-gray-900">{propertyForm.agoda_property_id}</span>
                   </div>
-                  <div className="flex justify-between items-center">
-                    <span className="text-sm font-medium text-gray-700">HyperGuest Property:</span>
-                    <span className="text-sm text-gray-900">{propertyForm.hyperguest_property_id}</span>
-                  </div>
+                  {propertyForm.hyperguest_property_id && (
+                    <div className="flex justify-between items-center">
+                      <span className="text-sm font-medium text-gray-700">HyperGuest Property:</span>
+                      <span className="text-sm text-gray-900">{propertyForm.hyperguest_property_id}</span>
+                    </div>
+                  )}
                   <div className="flex justify-between items-center">
                     <span className="text-sm font-medium text-gray-700">Configuration Status:</span>
                     <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-700 text-white">
