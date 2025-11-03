@@ -298,26 +298,37 @@ export default function RoomMapping() {
     setLoadingMessage('Loading existing mappings...');
 
     try {
-      // Fetch both Agoda and HyperGuest mappings
-      const [agodaResponse, hyperGuestResponse] = await Promise.all([
-        axios.get(`admin/properties/${agodaPropertyId}/room-mappings`),
-        axios.get(`admin/properties/${agodaPropertyId}/hyperguest-mappings`)
-      ]);
-
+      // Fetch Agoda mappings (required)
+      const agodaResponse = await axios.get(`admin/properties/${agodaPropertyId}/room-mappings`);
+      
       // Process Agoda mappings
+      let agodaData: any[] = [];
       if (agodaResponse.data.STATUS === 1) {
-        const agodaData = agodaResponse.data.RESULT.rooms || [];
+        agodaData = agodaResponse.data.RESULT.rooms || [];
         setAgodaMappings(agodaData);
       }
 
-      // Process HyperGuest mappings
-      if (hyperGuestResponse.data.statusCode === 200) {
-        const hyperGuestData = hyperGuestResponse.data.data.mappings || [];
-        setHyperGuestMappings(hyperGuestData);
+      // Try to fetch HyperGuest mappings (optional - may return 404 if not configured)
+      let hyperGuestData: any[] = [];
+      try {
+        const hyperGuestResponse = await axios.get(`admin/properties/${agodaPropertyId}/hyperguest-mappings`);
+        if (hyperGuestResponse.data.statusCode === 200) {
+          hyperGuestData = hyperGuestResponse.data.data.mappings || [];
+          setHyperGuestMappings(hyperGuestData);
+        }
+      } catch (hyperGuestError: any) {
+        // Handle 404 or other errors for HyperGuest - property may only have Agoda configured
+        if (hyperGuestError.response?.status === 404) {
+          console.log('HyperGuest not configured for this property');
+          setHyperGuestMappings([]);
+        } else {
+          console.error('Error fetching HyperGuest mappings:', hyperGuestError);
+          setHyperGuestMappings([]);
+        }
       }
 
       // Combine data into mapping rows
-      combineMappingData(agodaResponse.data.RESULT?.rooms || [], hyperGuestResponse.data.data?.mappings || []);
+      combineMappingData(agodaData, hyperGuestData);
 
       toast.success('Existing mappings loaded successfully');
     } catch (error: any) {
