@@ -580,7 +580,7 @@ export default function PropertyManagement() {
     setProcessingMessage('Deleting property configuration...');
     
     try {
-      const response = await axios.delete(`admin/properties/${propertyToDelete.property_id}/ota-config`);
+      const response = await axios.delete(`admin/properties/${propertyToDelete.property_id}/ota-config?cascade=true&include_history=true`);
       
       if (response.data.statusCode === 200) {
         toast.success('Property deleted successfully');
