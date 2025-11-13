@@ -992,6 +992,7 @@ export default function CalendarManagement() {
                 Agoda Property ID
               </label>
               <Select
+                instanceId="calendar-property-select"
                 value={propertyOptions.find(option => option.value === propertyId) || null}
                 onChange={(selectedOption) => setPropertyId(selectedOption?.value || "")}
                 options={propertyOptions}

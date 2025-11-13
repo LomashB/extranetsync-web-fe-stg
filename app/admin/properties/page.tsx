@@ -140,6 +140,18 @@ const ShimmerRow = () => (
     <td className="px-6 py-4"><Shimmer className="h-6 w-24" /></td>
     <td className="px-6 py-4"><Shimmer className="h-6 w-20" /></td>
     <td className="px-6 py-4"><Shimmer className="h-4 w-24" /></td>
+    <td className="px-6 py-4">
+      <div className="space-y-2">
+        <div className="flex items-center space-x-2">
+          <Shimmer className="h-8 w-20" />
+          <Shimmer className="h-8 w-24" />
+        </div>
+        <div className="flex items-center space-x-2">
+          <Shimmer className="h-8 w-16" />
+          <Shimmer className="h-8 w-20" />
+        </div>
+      </div>
+    </td>
   </tr>
 );
 
@@ -166,6 +178,9 @@ export default function PropertyManagement() {
   const [isEditMode, setIsEditMode] = useState(false);
   const [isAgodaDetailsModalOpen, setIsAgodaDetailsModalOpen] = useState(false);
   const [isHyperguestDetailsModalOpen, setIsHyperguestDetailsModalOpen] = useState(false);
+  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+  const [propertyToDelete, setPropertyToDelete] = useState<Property | null>(null);
+  const [deleteConfirmationText, setDeleteConfirmationText] = useState('');
   const [currentStep, setCurrentStep] = useState<SetupStep>(SetupStep.PROPERTY_IDS);
   const [propertyForm, setPropertyForm] = useState<PropertyFormData>({
     agoda_property_id: '',
@@ -545,6 +560,51 @@ export default function PropertyManagement() {
     setIsSetupModalOpen(true);
   };
 
+  // Delete property function
+  const handleDeleteProperty = (property: Property) => {
+    setPropertyToDelete(property);
+    setDeleteConfirmationText('');
+    setIsDeleteModalOpen(true);
+  };
+
+  const confirmDeleteProperty = async () => {
+    if (!propertyToDelete) return;
+    
+    // Check if confirmation text matches property name
+    if (deleteConfirmationText.trim().toLowerCase() !== propertyToDelete.agoda_property_name.trim().toLowerCase()) {
+      toast.error('Property name does not match. Please type the exact property name to confirm deletion.');
+      return;
+    }
+
+    setIsProcessing(true);
+    setProcessingMessage('Deleting property configuration...');
+    
+    try {
+      const response = await axios.delete(`admin/properties/${propertyToDelete.property_id}/ota-config`);
+      
+      if (response.data.statusCode === 200) {
+        toast.success('Property deleted successfully');
+        setIsDeleteModalOpen(false);
+        setPropertyToDelete(null);
+        setDeleteConfirmationText('');
+        await fetchProperties();
+      } else {
+        throw new Error(response.data.message || 'Failed to delete property');
+      }
+    } catch (error: any) {
+      console.error('Error deleting property:', error);
+      toast.error(error.response?.data?.message || 'Failed to delete property');
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  const cancelDelete = () => {
+    setIsDeleteModalOpen(false);
+    setPropertyToDelete(null);
+    setDeleteConfirmationText('');
+  };
+
   // View details functions
   const handleViewAgodaDetails = async (propertyId: string) => {
     setIsProcessing(true);
@@ -783,39 +843,59 @@ export default function PropertyManagement() {
                       {new Date(property.updated_at).toLocaleDateString()}
                     </div>
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                    <div className="flex items-center space-x-2">
-                      <Button
-                        variant="secondary"
-                        size="sm"
-                        leftIcon={<Edit size={14} />}
-                        onClick={() => handleEditProperty(property)}
-                        disabled={isProcessing}
-                      >
-                        Edit
-                      </Button>
-                      {property.agoda_enabled && (
+                  <td className="px-6 py-4 text-sm text-gray-500">
+                    <div className="space-y-2">
+                      {/* OTA Buttons Row */}
+                      <div className="flex items-center space-x-2">
+                        {property.agoda_enabled && (
+                          <Button
+                            variant="secondary"
+                            size="sm"
+                            leftIcon={<Globe size={14} />}
+                            onClick={() => handleViewAgodaDetails(property.property_id)}
+                            disabled={isProcessing}
+                          >
+                            Agoda
+                          </Button>
+                        )}
+                        {property.hyperguest_enabled && property.hyperguest_property_code && (
+                          <Button
+                            variant="secondary"
+                            size="sm"
+                            leftIcon={<Globe size={14} />}
+                            onClick={() => handleViewHyperguestDetails(property.hyperguest_property_code!)}
+                            disabled={isProcessing}
+                          >
+                            HyperGuest
+                          </Button>
+                        )}
+                        {!property.agoda_enabled && !property.hyperguest_enabled && (
+                          <span className="text-xs text-gray-400">No OTA configured</span>
+                        )}
+                      </div>
+                      
+                      {/* Edit/Delete Buttons Row */}
+                      <div className="flex items-center space-x-2">
                         <Button
                           variant="secondary"
                           size="sm"
-                          leftIcon={<Globe size={14} />}
-                          onClick={() => handleViewAgodaDetails(property.property_id)}
+                          leftIcon={<Edit size={14} />}
+                          onClick={() => handleEditProperty(property)}
                           disabled={isProcessing}
                         >
-                          Agoda
+                          Edit
                         </Button>
-                      )}
-                      {property.hyperguest_enabled && property.hyperguest_property_code && (
                         <Button
                           variant="secondary"
                           size="sm"
-                          leftIcon={<Globe size={14} />}
-                          onClick={() => handleViewHyperguestDetails(property.hyperguest_property_code!)}
+                          leftIcon={<Trash2 size={14} />}
+                          onClick={() => handleDeleteProperty(property)}
                           disabled={isProcessing}
+                          className="text-red-600 hover:text-red-700 hover:bg-red-50"
                         >
-                          HyperGuest
+                          Delete
                         </Button>
-                      )}
+                      </div>
                     </div>
                   </td>
                 </tr>
@@ -1442,6 +1522,102 @@ export default function PropertyManagement() {
                   </div>
                 </div>
               )}
+            </>
+          )}
+        </div>
+      </Modal>
+
+      {/* Delete Confirmation Modal */}
+      <Modal
+        isOpen={isDeleteModalOpen}
+        onClose={cancelDelete}
+        title="Delete Property Configuration"
+        size="md"
+      >
+        <div className="space-y-6">
+          {propertyToDelete && (
+            <>
+              <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+                <div className="flex items-start">
+                  <AlertTriangle className="h-6 w-6 text-red-600 mt-0.5 mr-3 flex-shrink-0" />
+                  <div>
+                    <h3 className="text-sm font-medium text-red-800 mb-1">
+                      Warning: This action cannot be undone
+                    </h3>
+                    <p className="text-sm text-red-700">
+                      This will permanently delete the OTA configuration for this property. All associated mappings and settings will be removed.
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="space-y-4">
+                <div>
+                  <h4 className="text-sm font-medium text-gray-900 mb-2">Property Details:</h4>
+                  <div className="bg-gray-50 rounded-lg p-4 space-y-2">
+                    <div className="flex justify-between items-center">
+                      <span className="text-sm text-gray-600">Property Name:</span>
+                      <span className="text-sm font-medium text-gray-900">{propertyToDelete.agoda_property_name}</span>
+                    </div>
+                    <div className="flex justify-between items-center">
+                      <span className="text-sm text-gray-600">Agoda ID:</span>
+                      <span className="text-sm font-medium text-gray-900">{propertyToDelete.property_id}</span>
+                    </div>
+                    {propertyToDelete.hyperguest_property_code && (
+                      <div className="flex justify-between items-center">
+                        <span className="text-sm text-gray-600">HyperGuest ID:</span>
+                        <span className="text-sm font-medium text-gray-900">{propertyToDelete.hyperguest_property_code}</span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    To confirm deletion, type the property name exactly as shown above:
+                  </label>
+                  <Input
+                    type="text"
+                    value={deleteConfirmationText}
+                    onChange={(e) => setDeleteConfirmationText(e.target.value)}
+                    placeholder={propertyToDelete.agoda_property_name}
+                    className="w-full"
+                    disabled={isProcessing}
+                  />
+                  <p className="text-xs text-gray-500 mt-1">
+                    Property name: <span className="font-medium">{propertyToDelete.agoda_property_name}</span>
+                  </p>
+                </div>
+              </div>
+
+              {isProcessing && (
+                <div className="text-center py-4">
+                  <Loader className="mx-auto h-8 w-8 text-red-600 animate-spin" />
+                  <p className="text-sm text-gray-600 mt-2">{processingMessage}</p>
+                </div>
+              )}
+
+              <div className="flex justify-end space-x-3 pt-4 border-t">
+                <Button
+                  type="button"
+                  variant="secondary"
+                  onClick={cancelDelete}
+                  disabled={isProcessing}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  type="button"
+                  variant="primary"
+                  onClick={confirmDeleteProperty}
+                  isLoading={isProcessing}
+                  disabled={isProcessing || deleteConfirmationText.trim().toLowerCase() !== propertyToDelete.agoda_property_name.trim().toLowerCase()}
+                  leftIcon={<Trash2 size={16} />}
+                  className="bg-red-600 hover:bg-red-700 focus:ring-red-500"
+                >
+                  Delete Property
+                </Button>
+              </div>
             </>
           )}
         </div>
