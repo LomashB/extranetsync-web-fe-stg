@@ -163,6 +163,7 @@ export default function PropertyManagement() {
   
   // Modal & Form states
   const [isSetupModalOpen, setIsSetupModalOpen] = useState(false);
+  const [isEditMode, setIsEditMode] = useState(false);
   const [isAgodaDetailsModalOpen, setIsAgodaDetailsModalOpen] = useState(false);
   const [isHyperguestDetailsModalOpen, setIsHyperguestDetailsModalOpen] = useState(false);
   const [currentStep, setCurrentStep] = useState<SetupStep>(SetupStep.PROPERTY_IDS);
@@ -492,6 +493,7 @@ export default function PropertyManagement() {
 
   const resetModal = () => {
     setIsSetupModalOpen(false);
+    setIsEditMode(false);
     setCurrentStep(SetupStep.PROPERTY_IDS);
     setPropertyForm({
       agoda_property_id: '',
@@ -531,6 +533,17 @@ export default function PropertyManagement() {
     property.property_id.toLowerCase().includes(searchTerm.toLowerCase()) ||
     (property.hyperguest_property_code && property.hyperguest_property_code.toLowerCase().includes(searchTerm.toLowerCase()))
   );
+
+  // Edit property function
+  const handleEditProperty = (property: Property) => {
+    setIsEditMode(true);
+    setPropertyForm({
+      agoda_property_id: property.property_id,
+      hyperguest_property_id: property.hyperguest_property_code || ''
+    });
+    setCurrentStep(SetupStep.PROPERTY_IDS);
+    setIsSetupModalOpen(true);
+  };
 
   // View details functions
   const handleViewAgodaDetails = async (propertyId: string) => {
@@ -748,7 +761,7 @@ export default function PropertyManagement() {
                     </div>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="flex items-center space-x-2">
+                    <div className="flex items-start flex-col gap-2">
                       {property.agoda_enabled && (
                         <span className="inline-flex items-center px-2 py-1 rounded text-xs font-medium bg-gray-100 text-gray-800">
                           Agoda
@@ -772,6 +785,15 @@ export default function PropertyManagement() {
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                     <div className="flex items-center space-x-2">
+                      <Button
+                        variant="secondary"
+                        size="sm"
+                        leftIcon={<Edit size={14} />}
+                        onClick={() => handleEditProperty(property)}
+                        disabled={isProcessing}
+                      >
+                        Edit
+                      </Button>
                       {property.agoda_enabled && (
                         <Button
                           variant="secondary"
@@ -819,7 +841,7 @@ export default function PropertyManagement() {
       <Modal
         isOpen={isSetupModalOpen}
         onClose={resetModal}
-        title={`Property Setup - ${getStepTitle(currentStep)}`}
+        title={`${isEditMode ? 'Edit' : 'Add'} Property - ${getStepTitle(currentStep)}`}
         size="lg"
       >
         <div className="space-y-6">
@@ -859,11 +881,25 @@ export default function PropertyManagement() {
           {currentStep === SetupStep.PROPERTY_IDS && (
             <div className="space-y-4">
               <div>
-                <h3 className="text-lg font-medium text-gray-900 mb-2">Enter Property IDs</h3>
+                <h3 className="text-lg font-medium text-gray-900 mb-2">
+                  {isEditMode ? 'Update Property IDs' : 'Enter Property IDs'}
+                </h3>
                 <p className="text-sm text-gray-600 mb-4">
-                  Provide the property ID for Agoda (required). HyperGuest property ID is optional.
+                  {isEditMode 
+                    ? 'Update the property IDs for Agoda and HyperGuest. You can add HyperGuest configuration if not previously set.'
+                    : 'Provide the property ID for Agoda (required). HyperGuest property ID is optional.'
+                  }
                 </p>
               </div>
+              
+              {isEditMode && (
+                <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 flex items-start">
+                  <Info className="h-5 w-5 text-blue-600 mt-0.5 mr-2 flex-shrink-0" />
+                  <p className="text-sm text-blue-800">
+                    You are editing an existing property. Changes will update the configuration.
+                  </p>
+                </div>
+              )}
               
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -876,7 +912,13 @@ export default function PropertyManagement() {
                   onChange={(e) => setPropertyForm({ ...propertyForm, agoda_property_id: e.target.value })}
                   placeholder="Enter Agoda property ID"
                   required
+                  disabled={isEditMode}
                 />
+                {isEditMode && (
+                  <p className="text-xs text-gray-500 mt-1">
+                    Agoda Property ID cannot be changed for existing properties
+                  </p>
+                )}
               </div>
 
               <div>
@@ -890,6 +932,14 @@ export default function PropertyManagement() {
                   onChange={(e) => setPropertyForm({ ...propertyForm, hyperguest_property_id: e.target.value })}
                   placeholder="Enter HyperGuest property ID (optional)"
                 />
+                {isEditMode && (
+                  <p className="text-xs text-gray-500 mt-1">
+                    {propertyForm.hyperguest_property_id 
+                      ? 'Update or remove HyperGuest integration'
+                      : 'Add HyperGuest integration to this property'
+                    }
+                  </p>
+                )}
               </div>
             </div>
           )}
