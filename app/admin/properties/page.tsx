@@ -124,6 +124,7 @@ enum SetupStep {
   AGODA_DETAILS = 'agoda_details',
   AGODA_PERCENTAGE = 'agoda_percentage',
   HYPERGUEST_FETCH = 'hyperguest_fetch',
+  HYPERGUEST_CURRENCY = 'hyperguest_currency',
   HYPERGUEST_DETAILS = 'hyperguest_details',
   HYPERGUEST_PERCENTAGE = 'hyperguest_percentage',
   OTA_CONFIG = 'ota_config',
@@ -194,6 +195,8 @@ export default function PropertyManagement() {
   const [hyperguestDetails, setHyperguestDetails] = useState<PropertyDetails | null>(null);
   const [agodaPercentage, setAgodaPercentage] = useState<number>(0);
   const [hyperguestPercentage, setHyperguestPercentage] = useState<number>(0);
+  const [hyperguestCurrency, setHyperguestCurrency] = useState<string>('');
+  const [hyperguestCurrencyExists, setHyperguestCurrencyExists] = useState<boolean>(false);
   
   // View details states
   const [viewAgodaProperty, setViewAgodaProperty] = useState<AgodaProperty | null>(null);
@@ -358,6 +361,7 @@ export default function PropertyManagement() {
         setHyperguestProperty(details.property);
         setHyperguestDetails(details);
         setHyperguestPercentage(details.property.extra_guest_percentage || 0);
+        
         return details;
       } else {
         throw new Error(response.data.MESSAGE || 'Failed to get HyperGuest property details');
@@ -366,6 +370,50 @@ export default function PropertyManagement() {
       console.error('Error fetching HyperGuest details:', error);
       toast.error(error.response?.data?.MESSAGE || 'Failed to get HyperGuest property details');
       return null;
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  const checkHyperguestCurrency = async (propertyCode: string) => {
+    try {
+      const response = await axios.get(`admin/hyperguest/properties/${propertyCode}/currency`);
+      
+      if (response.data.statusCode === 200 && response.data.data?.currency) {
+        setHyperguestCurrency(response.data.data.currency);
+        setHyperguestCurrencyExists(true);
+      } else {
+        setHyperguestCurrency('');
+        setHyperguestCurrencyExists(false);
+      }
+    } catch (error: any) {
+      console.error('Error checking HyperGuest currency:', error);
+      setHyperguestCurrency('');
+      setHyperguestCurrencyExists(false);
+    }
+  };
+
+  const updateHyperguestCurrency = async (propertyCode: string, currency: string) => {
+    setIsProcessing(true);
+    setProcessingMessage('Updating HyperGuest property currency...');
+    
+    try {
+      const response = await axios.put(`admin/hyperguest/properties/${propertyCode}/currency`, {
+        currency: currency.toUpperCase()
+      });
+      
+      if (response.data.statusCode === 200) {
+        toast.success('HyperGuest currency updated successfully');
+        setHyperguestCurrency(currency.toUpperCase());
+        setHyperguestCurrencyExists(true);
+        return true;
+      } else {
+        throw new Error(response.data.message || 'Failed to update currency');
+      }
+    } catch (error: any) {
+      console.error('Error updating HyperGuest currency:', error);
+      toast.error(error.response?.data?.message || 'Failed to update HyperGuest currency');
+      return false;
     } finally {
       setIsProcessing(false);
     }
@@ -473,9 +521,25 @@ export default function PropertyManagement() {
       case SetupStep.HYPERGUEST_FETCH:
         const hyperguestSuccess = await syncHyperguestProperty(propertyForm.hyperguest_property_id);
         if (hyperguestSuccess) {
-          setCurrentStep(SetupStep.HYPERGUEST_DETAILS);
-          fetchHyperguestDetails(propertyForm.hyperguest_property_id);
+          // Check currency after sync
+          await checkHyperguestCurrency(propertyForm.hyperguest_property_id);
+          setCurrentStep(SetupStep.HYPERGUEST_CURRENCY);
         }
+        break;
+        
+      case SetupStep.HYPERGUEST_CURRENCY:
+        if (!hyperguestCurrencyExists || !hyperguestCurrency) {
+          if (!hyperguestCurrency || hyperguestCurrency.trim().length !== 3) {
+            toast.error('Please enter a valid 3-letter currency code (e.g., USD, EUR, INR)');
+            return;
+          }
+          const currencyUpdated = await updateHyperguestCurrency(propertyForm.hyperguest_property_id, hyperguestCurrency);
+          if (!currencyUpdated) {
+            return;
+          }
+        }
+        setCurrentStep(SetupStep.HYPERGUEST_DETAILS);
+        fetchHyperguestDetails(propertyForm.hyperguest_property_id);
         break;
         
       case SetupStep.HYPERGUEST_DETAILS:
@@ -520,6 +584,8 @@ export default function PropertyManagement() {
     setHyperguestDetails(null);
     setAgodaPercentage(0);
     setHyperguestPercentage(0);
+    setHyperguestCurrency('');
+    setHyperguestCurrencyExists(false);
     setIsProcessing(false);
     setProcessingMessage('');
   };
@@ -656,6 +722,7 @@ export default function PropertyManagement() {
       case SetupStep.AGODA_PERCENTAGE: return 'Agoda Settings';
       case SetupStep.HYPERGUEST_FETCH: return 'Connect HyperGuest';
       case SetupStep.HYPERGUEST_DETAILS: return 'HyperGuest Details';
+      case SetupStep.HYPERGUEST_CURRENCY: return 'HyperGuest Currency';
       case SetupStep.HYPERGUEST_PERCENTAGE: return 'HyperGuest Settings';
       case SetupStep.OTA_CONFIG: return 'OTA Configuration';
       case SetupStep.COMPLETE: return 'Setup Complete';
@@ -671,6 +738,7 @@ export default function PropertyManagement() {
       case SetupStep.AGODA_PERCENTAGE: return 'Save & Continue';
       case SetupStep.HYPERGUEST_FETCH: return 'Connect to HyperGuest';
       case SetupStep.HYPERGUEST_DETAILS: return 'Continue';
+      case SetupStep.HYPERGUEST_CURRENCY: return hyperguestCurrencyExists ? 'Continue' : 'Save Currency & Continue';
       case SetupStep.HYPERGUEST_PERCENTAGE: return 'Save & Continue';
       case SetupStep.OTA_CONFIG: return 'Complete Setup';
       case SetupStep.COMPLETE: return 'Finish';
@@ -925,14 +993,15 @@ export default function PropertyManagement() {
         size="lg"
       >
         <div className="space-y-6">
-          {/* Progress Bar */}
-          <div className="flex items-center space-x-2 text-xs text-gray-500">
+          {/* Progress Bar - Desktop */}
+          <div className="hidden md:flex items-center space-x-2 text-xs text-gray-500">
             {[
               SetupStep.PROPERTY_IDS,
               SetupStep.AGODA_FETCH,
               SetupStep.AGODA_DETAILS,
               SetupStep.AGODA_PERCENTAGE,
               SetupStep.HYPERGUEST_FETCH,
+              SetupStep.HYPERGUEST_CURRENCY,
               SetupStep.HYPERGUEST_DETAILS,
               SetupStep.HYPERGUEST_PERCENTAGE,
               SetupStep.OTA_CONFIG,
@@ -955,6 +1024,46 @@ export default function PropertyManagement() {
                 )}
               </React.Fragment>
             ))}
+          </div>
+
+          {/* Progress Bar - Mobile */}
+          <div className="md:hidden">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-sm font-medium text-gray-900">
+                Step {[
+                  SetupStep.PROPERTY_IDS,
+                  SetupStep.AGODA_FETCH,
+                  SetupStep.AGODA_DETAILS,
+                  SetupStep.AGODA_PERCENTAGE,
+                  SetupStep.HYPERGUEST_FETCH,
+                  SetupStep.HYPERGUEST_CURRENCY,
+                  SetupStep.HYPERGUEST_DETAILS,
+                  SetupStep.HYPERGUEST_PERCENTAGE,
+                  SetupStep.OTA_CONFIG,
+                  SetupStep.COMPLETE
+                ].indexOf(currentStep) + 1} of 10
+              </span>
+              <span className="text-xs text-gray-500">{getStepTitle(currentStep)}</span>
+            </div>
+            <div className="w-full bg-gray-200 rounded-full h-2">
+              <div 
+                className="bg-gray-700 h-2 rounded-full transition-all duration-300"
+                style={{ 
+                  width: `${([
+                    SetupStep.PROPERTY_IDS,
+                    SetupStep.AGODA_FETCH,
+                    SetupStep.AGODA_DETAILS,
+                    SetupStep.AGODA_PERCENTAGE,
+                    SetupStep.HYPERGUEST_FETCH,
+                    SetupStep.HYPERGUEST_CURRENCY,
+                    SetupStep.HYPERGUEST_DETAILS,
+                    SetupStep.HYPERGUEST_PERCENTAGE,
+                    SetupStep.OTA_CONFIG,
+                    SetupStep.COMPLETE
+                  ].indexOf(currentStep) + 1) * 10}%` 
+                }}
+              />
+            </div>
           </div>
 
           {/* Step Content */}
@@ -1284,6 +1393,77 @@ export default function PropertyManagement() {
                       </div>
                     ))}
                   
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {currentStep === SetupStep.HYPERGUEST_CURRENCY && (
+            <div className="space-y-4">
+              <div>
+                <h3 className="text-lg font-medium text-gray-900 mb-2">HyperGuest Property Currency</h3>
+                <p className="text-sm text-gray-600">
+                  {hyperguestCurrencyExists 
+                    ? 'Currency is already configured for this property.'
+                    : 'Please set the currency code for this HyperGuest property.'
+                  }
+                </p>
+              </div>
+              
+              {hyperguestCurrencyExists ? (
+                <div className="bg-gray-50 rounded-lg p-4">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center">
+                      <CreditCard className="h-5 w-5 text-gray-700 mr-2" />
+                      <span className="font-medium">Current Currency</span>
+                    </div>
+                    <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-gray-700 text-white">
+                      {hyperguestCurrency}
+                    </span>
+                  </div>
+                  <p className="text-xs text-gray-500 mt-2">
+                    The currency is already set. You can proceed to the next step.
+                  </p>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+                    <div className="flex items-start">
+                      <AlertTriangle className="h-5 w-5 text-yellow-600 mt-0.5 mr-3 flex-shrink-0" />
+                      <div>
+                        <h4 className="text-sm font-medium text-yellow-800 mb-1">
+                          Currency Not Configured
+                        </h4>
+                        <p className="text-sm text-yellow-700">
+                          This HyperGuest property does not have a currency set. Please add a valid 3-letter currency code to continue.
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                  
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      <CreditCard className="h-4 w-4 inline mr-1" />
+                      Currency Code <span className="text-red-500">*</span>
+                    </label>
+                    <Input
+                      type="text"
+                      value={hyperguestCurrency}
+                      onChange={(e) => {
+                        const value = e.target.value.toUpperCase().replace(/[^A-Z]/g, '');
+                        if (value.length <= 3) {
+                          setHyperguestCurrency(value);
+                        }
+                      }}
+                      placeholder="e.g., USD, EUR, INR"
+                      maxLength={3}
+                      className="uppercase"
+                      required
+                    />
+                    <p className="text-xs text-gray-500 mt-1">
+                      Enter a valid 3-letter ISO currency code (e.g., USD for US Dollar, EUR for Euro, INR for Indian Rupee)
+                    </p>
                   </div>
                 </div>
               )}
