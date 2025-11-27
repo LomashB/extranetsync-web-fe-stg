@@ -21,24 +21,35 @@ const formatDate = (d: Date | string | any) => {
   if (d instanceof Date) {
     return d.toISOString().slice(0, 10);
   }
-  if (d && typeof d === "object" && d.date) {
-    // Handle case where d is an object with a date property
-    if (typeof d.date === "string") {
-      return d.date;
+  if (d && typeof d === "object") {
+    if (d.fullDate) {
+      return d.fullDate;
     }
-    if (d.date instanceof Date) {
-      return d.date.toISOString().slice(0, 10);
+    if (d.isoDate || d.iso_date) {
+      return d.isoDate || d.iso_date;
     }
-    // Handle case where d.date is a number (day of month)
-    if (typeof d.date === "number") {
-      // We need to construct a proper date string from the date object
-      const year = new Date().getFullYear();
-      const month = d.month || new Date().getMonth() + 1;
-      const day = d.date;
-      return `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+    if (d.date) {
+      if (typeof d.date === "string") {
+        return d.date;
+      }
+      if (d.date instanceof Date) {
+        return d.date.toISOString().slice(0, 10);
+      }
+      if (typeof d.date === "number") {
+        const year = d.year || new Date().getFullYear();
+        const month = d.month || new Date().getMonth() + 1;
+        const day = d.date;
+        return `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+      }
     }
   }
   return "";
+};
+
+const addDays = (date: Date, days: number) => {
+  const result = new Date(date);
+  result.setDate(result.getDate() + days);
+  return result;
 };
 
 const DEFAULT_DAYS_OPTIONS = [7, 14];
@@ -200,6 +211,26 @@ export default function CalendarManagement() {
         `admin/availability?days=${days}&start_date=${formatDate(startDate)}&property_id=${propertyId}`
       );
       const data = resp.data.RESULT?.[0] || null;
+
+      if (data) {
+        const baseDate = new Date(startDate);
+        const enrichColumns = (columns?: any[]) =>
+          (columns || []).map((col, index) => ({
+            ...col,
+            fullDate: addDays(baseDate, index).toISOString().slice(0, 10),
+          }));
+
+        data.agoda = {
+          ...data.agoda,
+          date_columns: enrichColumns(data.agoda?.date_columns),
+        };
+
+        data.hyperguest = {
+          ...data.hyperguest,
+          date_columns: enrichColumns(data.hyperguest?.date_columns),
+        };
+      }
+
       setCalendarData(data);
       setBasePriceEdits({});
       setInventoryEdits({ agoda: {}, hyperguest: {} });
