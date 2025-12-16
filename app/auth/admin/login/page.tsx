@@ -8,7 +8,7 @@ import { EyeIcon, EyeOffIcon } from 'lucide-react';
 import Input from '../../../../components/UI/Input';
 import Button from '../../../../components/UI/Button'; 
 import Link from 'next/link';
-import PageTransitionWrapper from '@components/PageTransitionWrapper';
+import PageTransitionWrapper from '../../../../components/PageTransitionWrapper';
 
 export default function AdminLogin() {
   const router = useRouter();
@@ -120,7 +120,7 @@ export default function AdminLogin() {
   };
 
   return (
-    <PageTransitionWrapper>
+    <PageTransitionWrapper variant="fadeUp" duration={0.5}>
       <div className="min-h-screen flex flex-col items-center justify-center p-3 sm:p-4 lg:p-6 relative overflow-hidden bg-black/90"
         style={{
           backgroundImage: `url('/textures/bg-texture.png')`,

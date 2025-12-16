@@ -8,6 +8,7 @@ import Button from "../../../components/UI/Button";
 import Input from "../../../components/UI/Input";
 import SearchInput from "../../../components/UI/SearchInput";
 import Shimmer from "../../../components/UI/Shimmer";
+import Modal from "../../../components/UI/Modal";
 import PageTransitionWrapper from "../../../components/PageTransitionWrapper";
 import DatePicker from "react-datepicker";
 import "react-datepicker/dist/react-datepicker.css";
@@ -51,8 +52,6 @@ const addDays = (date: Date, days: number) => {
   result.setDate(result.getDate() + days);
   return result;
 };
-
-const DEFAULT_DAYS_OPTIONS = [7, 14];
 
 interface CalendarData {
   property_id: string;
@@ -150,8 +149,8 @@ const ShimmerTableRows = () => (
 export default function CalendarManagement() {
   // UI/Filter state
   const [propertyId, setPropertyId] = useState("");
-  const [days, setDays] = useState(7);
   const [startDate, setStartDate] = useState<Date>(new Date());
+  const [endDate, setEndDate] = useState<Date>(addDays(new Date(), 7));
   const [loading, setLoading] = useState(false);
   const [initialLoading, setInitialLoading] = useState(false);
   const [calendarData, setCalendarData] = useState<CalendarData | null>(null);
@@ -166,6 +165,9 @@ export default function CalendarManagement() {
   const [selectedCells, setSelectedCells] = useState<Set<string>>(new Set());
   const [saving, setSaving] = useState(false);
   const [selectionMode, setSelectionMode] = useState<'none' | 'base' | 'availability'>('none');
+  const [isDateModalOpen, setIsDateModalOpen] = useState(false);
+  const [tempStartDate, setTempStartDate] = useState<Date>(startDate);
+  const [tempEndDate, setTempEndDate] = useState<Date>(endDate);
   
   // Drag selection state
   const [isDragging, setIsDragging] = useState(false);
@@ -203,12 +205,18 @@ export default function CalendarManagement() {
       toast.error("Please enter property ID.");
       return;
     }
+    // Basic validation for date range
+    if (endDate < startDate) {
+      toast.error("End date cannot be before start date.");
+      return;
+    }
+
     setLoading(true);
     setInitialLoading(true);
     setCalendarData(null);
     try {
       const resp = await axios.get(
-        `admin/availability?days=${days}&start_date=${formatDate(startDate)}&property_id=${propertyId}`
+        `admin/availability?start_date=${formatDate(startDate)}&end_date=${formatDate(endDate)}&property_id=${propertyId}`
       );
       const data = resp.data.RESULT?.[0] || null;
 
@@ -246,7 +254,7 @@ export default function CalendarManagement() {
       setLoading(false);
       setInitialLoading(false);
     }
-  }, [propertyId, days, startDate]);
+  }, [propertyId, startDate, endDate]);
 
   // Auto-search when property ID changes
   useEffect(() => {
@@ -1040,32 +1048,21 @@ export default function CalendarManagement() {
               <div className="flex-1">
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   <Calendar className="h-4 w-4 inline mr-1" />
-                  Days
+                  Date Range
                 </label>
-                <select
-                  value={days}
-                  onChange={e => setDays(Number(e.target.value))}
-                  className="w-full px-3 py-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                <Button
+                  type="button"
+                  variant="secondary"
+                  className="w-full justify-start"
+                  onClick={() => {
+                    // Prime temp values when opening the modal
+                    setTempStartDate(startDate);
+                    setTempEndDate(endDate);
+                    setIsDateModalOpen(true);
+                  }}
                 >
-                  {DEFAULT_DAYS_OPTIONS.map(opt => (
-                    <option key={opt} value={opt}>
-                      {opt} days
-                    </option>
-                  ))}
-                </select>
-              </div>
-              
-              <div className="flex-1">
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  <Calendar className="h-4 w-4 inline mr-1" />
-                  Start Date
-                </label>
-                <DatePicker
-                  selected={startDate}
-                  onChange={(date: Date | null) => date && setStartDate(date)}
-                  dateFormat="yyyy-MM-dd"
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                />
+                  {`${formatDate(startDate)} to ${formatDate(endDate)}`}
+                </Button>
               </div>
             </div>
 
@@ -1082,6 +1079,69 @@ export default function CalendarManagement() {
             </div>
           </div>  
         </div>
+        
+        {/* Date Range Modal */}
+        <Modal
+          isOpen={isDateModalOpen}
+          onClose={() => setIsDateModalOpen(false)}
+          title="Select Date Range"
+          primaryActionLabel="Apply"
+          onPrimaryAction={() => {
+            if (!tempStartDate || !tempEndDate) {
+              toast.error("Please select both start and end dates.");
+              return;
+            }
+            if (tempEndDate < tempStartDate) {
+              toast.error("End date cannot be before start date.");
+              return;
+            }
+            setStartDate(tempStartDate);
+            setEndDate(tempEndDate);
+            setIsDateModalOpen(false);
+          }}
+          size="lg"
+        >
+          <div className="mb-4 p-3 bg-gray-50 rounded-lg border border-gray-200">
+            <p className="text-sm font-semibold text-gray-800">
+              {`${formatDate(tempStartDate)} → ${formatDate(tempEndDate)}`}
+            </p>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <p className="text-sm font-medium text-gray-700 mb-2">Start Date</p>
+              <DatePicker
+                selected={tempStartDate}
+                onChange={(date: Date | null) => {
+                  if (date) {
+                    setTempStartDate(date);
+                    if (tempEndDate < date) {
+                      setTempEndDate(date);
+                    }
+                  }
+                }}
+                selectsStart
+                startDate={tempStartDate}
+                inline
+                minDate={new Date()}
+              />
+            </div>
+            <div>
+              <p className="text-sm font-medium text-gray-700 mb-2">End Date</p>
+              <DatePicker
+                selected={tempEndDate}
+                onChange={(date: Date | null) => {
+                  if (date) {
+                    setTempEndDate(date);
+                  }
+                }}
+                selectsEnd
+                endDate={tempEndDate}
+                minDate={tempStartDate}
+                inline
+              />
+            </div>
+          </div>
+        </Modal>
             
         {/* Bulk Operations */}
         {calendarData && (

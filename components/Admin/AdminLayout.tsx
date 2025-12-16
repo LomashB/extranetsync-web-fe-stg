@@ -8,8 +8,8 @@ import { useAuth } from "../../context/AuthContext";
 import UnauthorizedModal from "./UnauthorizedModel";
 import { useLoading } from "../../context/LoadingContext";
 import { Roboto_Slab } from "next/font/google";
-import Button from "@components/UI/Button";
-import Modal from "@components/UI/Modal";
+import Button from "../UI/Button";
+import Modal from "../UI/Modal";
 import Image from "next/image";
 
 const robotoSlab = Roboto_Slab({
