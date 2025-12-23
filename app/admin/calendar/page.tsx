@@ -845,20 +845,21 @@ export default function CalendarManagement() {
       // Send pricing updates if any
       if (pricingPayload.length > 0) {
         try {
-          // API expects an array of { date, agoda_rooms, hyperguest_rooms }
-          // [
-          //   {
-          //     "date": "2026-12-20",
-          //     "agoda_rooms": [{ "agoda_room_id": "1217830716", "price": 2200 }],
-          //     "hyperguest_rooms": [
-          //       { "room_type_code": "Room-02", "rate_plan_code": "CP", "price": 200 }
-          //     ]
-          //   }
-          // ]
-          await axios.put(
-            `/admin/properties/${propertyId}/pricing/bulk`,
-            pricingPayload
-          );
+          // API expects: { pricing: [ { date, agoda_rooms, hyperguest_rooms } ] }
+          // {
+          //   "pricing": [
+          //     {
+          //       "date": "2026-12-20",
+          //       "agoda_rooms": [{ "agoda_room_id": "1217830716", "price": 2200 }],
+          //       "hyperguest_rooms": [
+          //         { "room_type_code": "Room-02", "rate_plan_code": "CP", "price": 200 }
+          //       ]
+          //     }
+          //   ]
+          // }
+          await axios.put(`/admin/properties/${propertyId}/pricing/bulk`, {
+            pricing: pricingPayload,
+          });
           toast.success("Pricing updated successfully!");
         } catch (error: any) {
           console.error("Pricing update error:", error);
