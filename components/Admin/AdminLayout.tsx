@@ -65,7 +65,7 @@ interface AdminUser {
 const menuItems = [
   { href: "/admin/calendar", label: "Calendar", icon: Calendar },
   { href: "/admin/properties", label: "Properties", icon: Building },
-  { href: "/admin/room-mapping", label: "Room Mapping", icon: LinkIcon },
+  // { href: "/admin/room-mapping", label: "Room Mapping", icon: LinkIcon },
   { href: "/admin/bookings", label: "Bookings", icon: Package },
   { 
     label: "Settings",

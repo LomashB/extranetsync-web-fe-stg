@@ -1,9 +1,27 @@
-'use client';
+"use client";
 
 import React, { useState, useEffect, useCallback } from "react";
 import axios from "../../../lib/axios";
 import toast from "react-hot-toast";
-import { Calendar as CalendarIcon, RefreshCw, Save, Search, CheckSquare, Eraser, Square, Check, Building2, Globe, Bed, Star, Settings, Clock, CreditCard, Percent, Calendar } from "lucide-react";
+import {
+  Calendar as CalendarIcon,
+  RefreshCw,
+  Save,
+  Search,
+  CheckSquare,
+  Eraser,
+  Square,
+  Check,
+  Building2,
+  Globe,
+  Bed,
+  Star,
+  Settings,
+  Clock,
+  CreditCard,
+  Percent,
+  Calendar,
+} from "lucide-react";
 import Button from "../../../components/UI/Button";
 import Input from "../../../components/UI/Input";
 import SearchInput from "../../../components/UI/SearchInput";
@@ -14,33 +32,25 @@ import DatePicker from "react-datepicker";
 import "react-datepicker/dist/react-datepicker.css";
 import Select from "react-select";
 
-// Helper utility
+// ══════════════════════════════════════════════════════════════
+// HELPER UTILITIES
+// ══════════════════════════════════════════════════════════════
 const formatDate = (d: Date | string | any) => {
-  if (typeof d === "string") {
-    return d;
-  }
-  if (d instanceof Date) {
-    return d.toISOString().slice(0, 10);
-  }
+  if (typeof d === "string") return d;
+  if (d instanceof Date) return d.toISOString().slice(0, 10);
   if (d && typeof d === "object") {
-    if (d.fullDate) {
-      return d.fullDate;
-    }
-    if (d.isoDate || d.iso_date) {
-      return d.isoDate || d.iso_date;
-    }
+    if (d.fullDate) return d.fullDate;
+    if (d.isoDate || d.iso_date) return d.isoDate || d.iso_date;
     if (d.date) {
-      if (typeof d.date === "string") {
-        return d.date;
-      }
-      if (d.date instanceof Date) {
-        return d.date.toISOString().slice(0, 10);
-      }
+      if (typeof d.date === "string") return d.date;
+      if (d.date instanceof Date) return d.date.toISOString().slice(0, 10);
       if (typeof d.date === "number") {
         const year = d.year || new Date().getFullYear();
         const month = d.month || new Date().getMonth() + 1;
         const day = d.date;
-        return `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+        return `${year}-${String(month).padStart(2, "0")}-${String(
+          day
+        ).padStart(2, "0")}`;
       }
     }
   }
@@ -53,88 +63,96 @@ const addDays = (date: Date, days: number) => {
   return result;
 };
 
+// ══════════════════════════════════════════════════════════════
+// INTERFACES - UPDATED FOR NEW API
+// ══════════════════════════════════════════════════════════════
+interface RoomInventory {
+  agoda_room_id?: string;
+  room_type_code?: string;
+  rate_plan_code?: string;
+  room_name: string;
+  inventory: number;
+  availability: number;
+  booked_rooms: number;
+  occupancy_rate: number;
+  price?: number | null;
+  currency?: string | null;
+  has_pricing: boolean;
+  availability_status: string;
+  close_out: string;
+  max_occupancy: number;
+  has_availability_data: boolean;
+  sync_status: string;
+  restrictions: {
+    closed: boolean;
+    ctd: boolean;
+    cta: boolean;
+  };
+}
+
+interface DateColumn {
+  month: string;
+  date: number;
+  day: string;
+  average_room_rate?: number | null;
+  currency?: string | null;
+  inventory: number;
+  availability: number;
+  booked_rooms: number;
+  occupancy_rate: number;
+  availability_status: string;
+  close_out: string;
+  room_inventory: RoomInventory[];
+  fullDate?: string;
+}
+
 interface CalendarData {
   property_id: string;
   property_name: string;
   agoda: {
-    date_columns: Array<{
-      month: string;
-      date: number;
-      day: string;
-      base_room_rate: number;
-      inventory: number;
-      availability: number;
-      booked_rooms: number;
-      occupancy_rate: number;
-      availability_status: string;
-      close_out: string;
-      room_inventory: Array<{
-        agoda_room_id: string;
-        room_name: string;
-        room_class: string;
-        inventory: number;
-        availability: number;
-        booked_rooms: number;
-        occupancy_rate: number;
-        availability_status: string;
-        close_out: string;
-        max_occupancy: number;
-        is_mapped: boolean;
-        has_availability_data: boolean;
-        sync_status: string;
-        restrictions: {
-          closed: boolean;
-          ctd: boolean;
-          cta: boolean;
-        };
-      }>;
-    }>;
+    property_id: string;
+    property_name: string;
+    date_columns: DateColumn[];
   };
   hyperguest: {
-    date_columns: Array<{
-      month: string;
-      date: number;
-      day: string;
-      inventory: number;
-      availability: number;
-      booked_rooms: number;
-      occupancy_rate: number;
-      availability_status: string;
-      close_out: string;
-      room_inventory: Array<{
-        hyperguest_room_id: string;
-        room_name: string;
-        room_class: string;
-        inventory: number;
-        availability: number;
-        booked_rooms: number;
-        occupancy_rate: number;
-        availability_status: string;
-        close_out: string;
-        max_occupancy: number;
-        is_mapped: boolean;
-        has_availability_data: boolean;
-        sync_status: string;
-        restrictions: {
-          closed: boolean;
-          ctd: boolean;
-          cta: boolean;
-        };
-      }>;
-    }>;
+    property_code: string;
+    property_name: string;
+    date_columns: DateColumn[];
+  };
+  ota_configuration: {
+    agoda_enabled: boolean;
+    hyperguest_enabled: boolean;
+    hyperguest_property_code: string;
   };
 }
 
-// ──────────────────────────────────────────────────────────────
-// • Shimmer Components
-// ──────────────────────────────────────────────────────────────
+interface MergedRoom {
+  room_id: string;
+  room_name: string;
+  ota: "agoda" | "hyperguest";
+  room_data: RoomInventory;
+}
+
+// ══════════════════════════════════════════════════════════════
+// SHIMMER COMPONENTS
+// ══════════════════════════════════════════════════════════════
 const ShimmerRow = () => (
   <tr>
-    <td className="px-6 py-4"><Shimmer className="h-12 w-full" /></td>
-    <td className="px-6 py-4"><Shimmer className="h-12 w-full" /></td>
-    <td className="px-6 py-4"><Shimmer className="h-12 w-full" /></td>
-    <td className="px-6 py-4"><Shimmer className="h-12 w-full" /></td>
-    <td className="px-6 py-4"><Shimmer className="h-12 w-full" /></td>
+    <td className="px-6 py-4">
+      <Shimmer className="h-12 w-full" />
+    </td>
+    <td className="px-6 py-4">
+      <Shimmer className="h-12 w-full" />
+    </td>
+    <td className="px-6 py-4">
+      <Shimmer className="h-12 w-full" />
+    </td>
+    <td className="px-6 py-4">
+      <Shimmer className="h-12 w-full" />
+    </td>
+    <td className="px-6 py-4">
+      <Shimmer className="h-12 w-full" />
+    </td>
   </tr>
 );
 
@@ -146,44 +164,76 @@ const ShimmerTableRows = () => (
   </>
 );
 
+// ══════════════════════════════════════════════════════════════
+// MAIN COMPONENT
+// ══════════════════════════════════════════════════════════════
 export default function CalendarManagement() {
-  // UI/Filter state
+  // ─────────────────────────────────────────────────────────────
+  // STATE MANAGEMENT
+  // ─────────────────────────────────────────────────────────────
   const [propertyId, setPropertyId] = useState("");
   const [startDate, setStartDate] = useState<Date>(new Date());
   const [endDate, setEndDate] = useState<Date>(addDays(new Date(), 7));
   const [loading, setLoading] = useState(false);
   const [initialLoading, setInitialLoading] = useState(false);
   const [calendarData, setCalendarData] = useState<CalendarData | null>(null);
-  
-  // Property options state
-  const [propertyOptions, setPropertyOptions] = useState<Array<{value: string, label: string}>>([]);
+
+  // Property options
+  const [propertyOptions, setPropertyOptions] = useState<
+    Array<{ value: string; label: string }>
+  >([]);
   const [loadingProperties, setLoadingProperties] = useState(false);
 
-  // Edit states
-  const [basePriceEdits, setBasePriceEdits] = useState<Record<string, number>>({});
-  const [inventoryEdits, setInventoryEdits] = useState<Record<string, Record<string, Record<string, number>>>>({ agoda: {}, hyperguest: {} });
+  // Edit states - UPDATED FOR PER-ROOM PRICING
+  const [priceEdits, setPriceEdits] = useState<
+    Record<string, Record<string, number>>
+  >({});
+  const [inventoryEdits, setInventoryEdits] = useState<
+    Record<string, Record<string, number>>
+  >({});
+
+  // Selection states
   const [selectedCells, setSelectedCells] = useState<Set<string>>(new Set());
   const [saving, setSaving] = useState(false);
-  const [selectionMode, setSelectionMode] = useState<'none' | 'base' | 'availability'>('none');
+  const [selectionMode, setSelectionMode] = useState<
+    "none" | "price" | "availability"
+  >("none");
+
+  // Modal states
   const [isDateModalOpen, setIsDateModalOpen] = useState(false);
   const [tempStartDate, setTempStartDate] = useState<Date>(startDate);
   const [tempEndDate, setTempEndDate] = useState<Date>(endDate);
-  
+
   // Drag selection state
   const [isDragging, setIsDragging] = useState(false);
-  const [dragStart, setDragStart] = useState<{date: string, roomId: string, ota?: 'agoda' | 'hyperguest'} | null>(null);
-  const [dragEnd, setDragEnd] = useState<{date: string, roomId: string, ota?: 'agoda' | 'hyperguest'} | null>(null);
+  const [dragStart, setDragStart] = useState<{
+    date: string;
+    roomId: string;
+    ota?: "agoda" | "hyperguest";
+  } | null>(null);
+  const [dragEnd, setDragEnd] = useState<{
+    date: string;
+    roomId: string;
+    ota?: "agoda" | "hyperguest";
+  } | null>(null);
 
-  // Fetch property options from OTA status API
+  // Client-side mount state to prevent hydration errors
+  const [mounted, setMounted] = useState(false);
+
+  // ─────────────────────────────────────────────────────────────
+  // FETCH PROPERTY OPTIONS
+  // ─────────────────────────────────────────────────────────────
   const fetchPropertyOptions = useCallback(async () => {
     setLoadingProperties(true);
     try {
-      const response = await axios.get('admin/ota-status');
+      const response = await axios.get("/admin/ota-status");
       if (response.data.success && response.data.data.configurations) {
-        const options = response.data.data.configurations.map((config: any) => ({
-          value: config.property_id,
-          label: `${config.agoda_property_name} (ID: ${config.property_id})`
-        }));
+        const options = response.data.data.configurations.map(
+          (config: any) => ({
+            value: config.property_id,
+            label: `${config.agoda_property_name} (ID: ${config.property_id})`,
+          })
+        );
         setPropertyOptions(options);
       }
     } catch (error: any) {
@@ -194,18 +244,15 @@ export default function CalendarManagement() {
     }
   }, []);
 
-  // Load property options on component mount
-  useEffect(() => {
-    fetchPropertyOptions();
-  }, [fetchPropertyOptions]);
-
-  // Fetches current OTA availability/pricing for selected property/period
+  // ─────────────────────────────────────────────────────────────
+  // FETCH CALENDAR DATA - UPDATED FOR NEW API
+  // ─────────────────────────────────────────────────────────────
   const fetchCalendar = useCallback(async () => {
     if (!propertyId.trim()) {
       toast.error("Please enter property ID.");
       return;
     }
-    // Basic validation for date range
+
     if (endDate < startDate) {
       toast.error("End date cannot be before start date.");
       return;
@@ -214,9 +261,12 @@ export default function CalendarManagement() {
     setLoading(true);
     setInitialLoading(true);
     setCalendarData(null);
+
     try {
       const resp = await axios.get(
-        `admin/availability?start_date=${formatDate(startDate)}&end_date=${formatDate(endDate)}&property_id=${propertyId}`
+        `/admin/availability?days=14&start_date=${formatDate(
+          startDate
+        )}&end_date=${formatDate(endDate)}&property_id=${propertyId}`
       );
       const data = resp.data.RESULT?.[0] || null;
 
@@ -237,14 +287,12 @@ export default function CalendarManagement() {
           ...data.hyperguest,
           date_columns: enrichColumns(data.hyperguest?.date_columns),
         };
-      }
 
-      setCalendarData(data);
-      setBasePriceEdits({});
-      setInventoryEdits({ agoda: {}, hyperguest: {} });
-      setSelectedCells(new Set());
-      setSelectionMode('none');
-      if (data) {
+        setCalendarData(data);
+        setPriceEdits({});
+        setInventoryEdits({});
+        setSelectedCells(new Set());
+        setSelectionMode("none");
         toast.success("Calendar data loaded successfully!");
       }
     } catch (error: any) {
@@ -256,305 +304,366 @@ export default function CalendarManagement() {
     }
   }, [propertyId, startDate, endDate]);
 
-  // Auto-search when property ID changes
+  // ─────────────────────────────────────────────────────────────
+  // EFFECTS
+  // ─────────────────────────────────────────────────────────────
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  useEffect(() => {
+    fetchPropertyOptions();
+  }, [fetchPropertyOptions]);
+
   useEffect(() => {
     if (propertyId.trim()) {
       fetchCalendar();
     }
   }, [propertyId, fetchCalendar]);
 
-  // Add global mouseup listener for drag selection
   useEffect(() => {
     const handleGlobalMouseUp = () => {
       if (isDragging) {
         handleMouseUp();
       }
     };
-    
-    document.addEventListener('mouseup', handleGlobalMouseUp);
+
+    document.addEventListener("mouseup", handleGlobalMouseUp);
     return () => {
-      document.removeEventListener('mouseup', handleGlobalMouseUp);
+      document.removeEventListener("mouseup", handleGlobalMouseUp);
     };
-  }, [isDragging, dragStart, dragEnd, calendarData, selectedCells, selectionMode]);
+  }, [
+    isDragging,
+    dragStart,
+    dragEnd,
+    calendarData,
+    selectedCells,
+    selectionMode,
+  ]);
 
-  // Handles in-table inline value editing
-  const handleBasePriceChange = (date: string, value: number) => {
-    setBasePriceEdits(prev => ({ ...prev, [date]: value }));
+  // ─────────────────────────────────────────────────────────────
+  // HELPER FUNCTIONS
+  // ─────────────────────────────────────────────────────────────
+  const createCellKey = (
+    date: string,
+    roomId: string,
+    type: "price" | "inventory" = "price"
+  ) => {
+    return `${type}_${roomId}_${date}`;
   };
 
-  const handleInventoryChange = (ota: "agoda" | "hyperguest", roomId: string, date: string, value: number) => {
-    setInventoryEdits((prev) => ({
-      ...prev,
-      [ota]: {
-        ...prev[ota],
-        [roomId]: { ...(prev[ota][roomId] || {}), [date]: value }
-      }
-    }));
+  const isCellSelected = (
+    date: string,
+    roomId: string,
+    type: "price" | "inventory" = "price"
+  ) => {
+    const cellKey = createCellKey(date, roomId, type);
+    return selectedCells.has(cellKey);
   };
 
-  // Helper function to create cell key with date and room class mapping
-  const createCellKey = (date: string, roomClassOrId: string, ota?: 'agoda' | 'hyperguest') => {
-    if (roomClassOrId === 'base') {
-      return `base_${date}`;
-    }
-    return `${ota}_${roomClassOrId}_${date}`;
-  };
+  const toggleCellSelection = (
+    date: string,
+    roomId: string,
+    type: "price" | "inventory" = "price"
+  ) => {
+    const cellKey = createCellKey(date, roomId, type);
 
-  // Toggle individual cell selection (Excel-like)
-  const toggleCellSelection = (date: string, roomClassOrId: string, ota?: 'agoda' | 'hyperguest') => {
-    const cellKey = createCellKey(date, roomClassOrId, ota);
-    const isBasePrice = roomClassOrId === 'base';
-    const isAvailability = ota === 'agoda' || ota === 'hyperguest';
-    
-    // Check if trying to select a different type than current mode
-    if (selectionMode === 'none') {
-      // First selection - set the mode
-      if (isBasePrice) {
-        setSelectionMode('base');
-      } else if (isAvailability) {
-        setSelectionMode('availability');
-      }
-    } else if (selectionMode === 'base' && !isBasePrice) {
-      toast.error("You can only select base prices when base price mode is active. Clear selection to change mode.");
-      return;
-    } else if (selectionMode === 'availability' && !isAvailability) {
-      toast.error("You can only select availability when availability mode is active. Clear selection to change mode.");
-      return;
-    }
-    
-    setSelectedCells(prev => {
-      const newSet = new Set(prev);
+    setSelectedCells((prev) => {
+      // Only keep selections for the current type to enforce exclusivity
+      const newSet = new Set<string>();
+      prev.forEach((key) => {
+        if (type === "price" && key.startsWith("price_")) {
+          newSet.add(key);
+        }
+        if (type === "inventory" && key.startsWith("inventory_")) {
+          newSet.add(key);
+        }
+      });
+
       if (newSet.has(cellKey)) {
         newSet.delete(cellKey);
-        // If no cells selected, reset mode
-        if (newSet.size === 0) {
-          setSelectionMode('none');
-        }
       } else {
         newSet.add(cellKey);
       }
+
+      const newMode: typeof selectionMode =
+        newSet.size === 0
+          ? "none"
+          : type === "price"
+          ? "price"
+          : "availability";
+      setSelectionMode(newMode);
+
       return newSet;
     });
   };
 
-  // Check if cell is selected
-  const isCellSelected = (date: string, roomClassOrId: string, ota?: 'agoda' | 'hyperguest') => {
-    const cellKey = createCellKey(date, roomClassOrId, ota);
-    return selectedCells.has(cellKey);
-  };
-
-  // Check if all cells in a row are selected
-  const isRowFullySelected = (type: 'base' | 'agoda' | 'hyperguest', roomId?: string) => {
+  const isRowFullySelected = (
+    roomId: string,
+    type: "price" | "inventory" = "price"
+  ) => {
     if (!calendarData) return false;
-    
-    const dates = calendarData.agoda?.date_columns?.map(d => formatDate(d)) || [];
-    
-    if (type === 'base') {
-      return dates.every(date => selectedCells.has(createCellKey(date, 'base')));
-    } else if (roomId) {
-      const ota = type as "agoda" | "hyperguest";
-      return dates.every(date => selectedCells.has(createCellKey(date, roomId, ota)));
-    }
-    
-    return false;
+    const dates = calendarData.agoda.date_columns.map((d) => formatDate(d));
+    return dates.every((date) => isCellSelected(date, roomId, type));
   };
 
-  // Check if all inventory cells in a column are selected (excluding base price)
-  const isColumnFullySelected = (dateObj: any) => {
+  const selectRoomRow = (
+    roomId: string,
+    type: "price" | "inventory" = "price"
+  ) => {
+    if (!calendarData) return;
+    const dates = calendarData.agoda.date_columns.map((d) => formatDate(d));
+
+    // Start from only the currently relevant type to keep modes exclusive
+    const newSelection = new Set<string>();
+    selectedCells.forEach((key) => {
+      if (type === "price" && key.startsWith("price_")) {
+        newSelection.add(key);
+      }
+      if (type === "inventory" && key.startsWith("inventory_")) {
+        newSelection.add(key);
+      }
+    });
+
+    dates.forEach((date) => {
+      newSelection.add(createCellKey(date, roomId, type));
+    });
+
+    setSelectedCells(newSelection);
+    if (type === "price") setSelectionMode("price");
+    else setSelectionMode("availability");
+  };
+
+  const unselectRoomRow = (
+    roomId: string,
+    type: "price" | "inventory" = "price"
+  ) => {
+    if (!calendarData) return;
+    const dates = calendarData.agoda.date_columns.map((d) => formatDate(d));
+    const newSelection = new Set(selectedCells);
+
+    dates.forEach((date) => {
+      newSelection.delete(createCellKey(date, roomId, type));
+    });
+
+    setSelectedCells(newSelection);
+  };
+
+  const isColumnFullySelected = (
+    dateObj: any,
+    type: "price" | "inventory" = "price"
+  ) => {
     if (!calendarData) return false;
-    
     const date = formatDate(dateObj);
-    const inventoryCells = new Set();
-    
-    // Check all Agoda rooms for this date
-    const agodaRooms = calendarData.agoda?.date_columns?.[0]?.room_inventory || [];
-    agodaRooms.forEach((room: any) => {
-      inventoryCells.add(createCellKey(date, room.agoda_room_id, 'agoda'));
-    });
-    
-    // Check all HyperGuest rooms for this date
-    const hyperguestRooms = calendarData.hyperguest?.date_columns?.[0]?.room_inventory || [];
-    hyperguestRooms.forEach((room: any) => {
-      inventoryCells.add(createCellKey(date, room.hyperguest_room_id, 'hyperguest'));
-    });
-    
-    // Check if all inventory cells in this column are selected
-    return Array.from(inventoryCells).every(cellKey => selectedCells.has(cellKey as string));
+    const allRooms = getAllRooms();
+
+    return allRooms.every((room) => isCellSelected(date, room.room_id, type));
   };
 
-  // Select entire row (all dates for a specific room/base price)
-  const selectRow = (type: 'base' | 'agoda' | 'hyperguest', roomId?: string) => {
+  const selectColumn = (
+    dateObj: any,
+    type: "price" | "inventory" = "price"
+  ) => {
     if (!calendarData) return;
-    
-    const isBasePrice = type === 'base';
-    const isAvailability = type === 'agoda' || type === 'hyperguest';
-    
-    // Check if trying to select a different type than current mode
-    if (selectionMode === 'none') {
-      // First selection - set the mode
-      if (isBasePrice) {
-        setSelectionMode('base');
-      } else if (isAvailability) {
-        setSelectionMode('availability');
+    const date = formatDate(dateObj);
+
+    // Start from only the currently relevant type to keep modes exclusive
+    const newSelection = new Set<string>();
+    selectedCells.forEach((key) => {
+      if (type === "price" && key.startsWith("price_")) {
+        newSelection.add(key);
       }
-    } else if (selectionMode === 'base' && !isBasePrice) {
-      toast.error("You can only select base prices when base price mode is active. Clear selection to change mode.");
-      return;
-    } else if (selectionMode === 'availability' && !isAvailability) {
-      toast.error("You can only select availability when availability mode is active. Clear selection to change mode.");
-      return;
-    }
-    
-    const dates = calendarData.agoda?.date_columns?.map(d => formatDate(d)) || [];
-    const newSelection = new Set(selectedCells);
-    
-    if (type === 'base') {
-      dates.forEach(date => {
-        newSelection.add(createCellKey(date, 'base'));
-      });
-    } else if (roomId) {
-      const ota = type as "agoda" | "hyperguest";
-      dates.forEach(date => {
-        newSelection.add(createCellKey(date, roomId, ota));
-      });
-    }
-    
-    setSelectedCells(newSelection);
-  };
-
-  // Unselect entire row (all dates for a specific room/base price)
-  const unselectRow = (type: 'base' | 'agoda' | 'hyperguest', roomId?: string) => {
-    if (!calendarData) return;
-    
-    const dates = calendarData.agoda?.date_columns?.map(d => formatDate(d)) || [];
-    const newSelection = new Set(selectedCells);
-    
-    if (type === 'base') {
-      dates.forEach(date => {
-        newSelection.delete(createCellKey(date, 'base'));
-      });
-    } else if (roomId) {
-      const ota = type as "agoda" | "hyperguest";
-      dates.forEach(date => {
-        newSelection.delete(createCellKey(date, roomId, ota));
-      });
-    }
-    
-    setSelectedCells(newSelection);
-  };
-
-  // Select entire column (all inventory rooms for a specific date, excluding base price)
-  const selectColumn = (dateObj: any) => {
-    if (!calendarData) return;
-    
-    // Check if trying to select availability when in base price mode
-    if (selectionMode === 'base') {
-      toast.error("You can only select base prices when base price mode is active. Clear selection to change mode.");
-      return;
-    }
-    
-    // Set mode to availability if not already set
-    if (selectionMode === 'none') {
-      setSelectionMode('availability');
-    }
-    
-    const date = formatDate(dateObj);
-    const newSelection = new Set(selectedCells);
-    
-    // Select all Agoda rooms for this date
-    const agodaRooms = calendarData.agoda?.date_columns?.[0]?.room_inventory || [];
-    agodaRooms.forEach((room: any) => {
-      newSelection.add(createCellKey(date, room.agoda_room_id, 'agoda'));
-    });
-    
-    // Select all HyperGuest rooms for this date
-    const hyperguestRooms = calendarData.hyperguest?.date_columns?.[0]?.room_inventory || [];
-    hyperguestRooms.forEach((room: any) => {
-      newSelection.add(createCellKey(date, room.hyperguest_room_id, 'hyperguest'));
-    });
-    
-    setSelectedCells(newSelection);
-  };
-
-  // Unselect entire column (all inventory rooms for a specific date, excluding base price)
-  const unselectColumn = (dateObj: any) => {
-    if (!calendarData) return;
-    
-    const date = formatDate(dateObj);
-    const newSelection = new Set(selectedCells);
-    
-    // Unselect all Agoda rooms for this date
-    const agodaRooms = calendarData.agoda?.date_columns?.[0]?.room_inventory || [];
-    agodaRooms.forEach((room: any) => {
-      newSelection.delete(createCellKey(date, room.agoda_room_id, 'agoda'));
-    });
-    
-    // Unselect all HyperGuest rooms for this date
-    const hyperguestRooms = calendarData.hyperguest?.date_columns?.[0]?.room_inventory || [];
-    hyperguestRooms.forEach((room: any) => {
-      newSelection.delete(createCellKey(date, room.hyperguest_room_id, 'hyperguest'));
-    });
-    
-    setSelectedCells(newSelection);
-  };
-
-  // Select all cells of a specific type
-  const selectAllCells = (type: 'base' | 'agoda' | 'hyperguest') => {
-    if (!calendarData) return;
-    
-    const isBasePrice = type === 'base';
-    const isAvailability = type === 'agoda' || type === 'hyperguest';
-    
-    // Check if trying to select a different type than current mode
-    if (selectionMode === 'none') {
-      // First selection - set the mode
-      if (isBasePrice) {
-        setSelectionMode('base');
-      } else if (isAvailability) {
-        setSelectionMode('availability');
+      if (type === "inventory" && key.startsWith("inventory_")) {
+        newSelection.add(key);
       }
-    } else if (selectionMode === 'base' && !isBasePrice) {
-      toast.error("You can only select base prices when base price mode is active. Clear selection to change mode.");
-      return;
-    } else if (selectionMode === 'availability' && !isAvailability) {
-      toast.error("You can only select availability when availability mode is active. Clear selection to change mode.");
-      return;
-    }
-    
-    const dates = calendarData.agoda?.date_columns?.map(d => formatDate(d)) || [];
-    const newSelection = new Set(selectedCells);
-    
-    if (type === 'base') {
-      dates.forEach(date => {
-        newSelection.add(createCellKey(date, 'base'));
-      });
-    } else {
-      const ota = type as "agoda" | "hyperguest";
-      const roomData = calendarData[ota]?.date_columns?.[0]?.room_inventory || [];
-      roomData.forEach((room: any) => {
-        const roomId = ota === 'agoda' ? room.agoda_room_id : room.hyperguest_room_id;
-        dates.forEach(date => {
-          newSelection.add(createCellKey(date, roomId, ota));
-        });
-      });
-    }
-    
+    });
+    const allRooms = getAllRooms();
+
+    allRooms.forEach((room) => {
+      newSelection.add(createCellKey(date, room.room_id, type));
+    });
+
     setSelectedCells(newSelection);
+    if (type === "price") setSelectionMode("price");
+    else setSelectionMode("availability");
+  };
+
+  const unselectColumn = (
+    dateObj: any,
+    type: "price" | "inventory" = "price"
+  ) => {
+    if (!calendarData) return;
+    const date = formatDate(dateObj);
+    const newSelection = new Set(selectedCells);
+    const allRooms = getAllRooms();
+
+    allRooms.forEach((room) => {
+      newSelection.delete(createCellKey(date, room.room_id, type));
+    });
+
+    setSelectedCells(newSelection);
+  };
+
+  const getAllRooms = (): MergedRoom[] => {
+    if (!calendarData) return [];
+
+    const agodaRoomMap = new Map<string, RoomInventory>();
+    const hgRoomMap = new Map<string, RoomInventory>();
+
+    // Collect unique Agoda rooms across all dates
+    (calendarData.agoda?.date_columns || []).forEach((col) => {
+      (col.room_inventory || []).forEach((room) => {
+        if (room.agoda_room_id && !agodaRoomMap.has(room.agoda_room_id)) {
+          agodaRoomMap.set(room.agoda_room_id, room);
+        }
+      });
+    });
+
+    // Collect unique HyperGuest rooms across all dates
+    (calendarData.hyperguest?.date_columns || []).forEach((col) => {
+      (col.room_inventory || []).forEach((room) => {
+        if (room.room_type_code && room.rate_plan_code) {
+          const id = `${room.room_type_code}_${room.rate_plan_code}`;
+          if (!hgRoomMap.has(id)) {
+            hgRoomMap.set(id, room);
+          }
+        }
+      });
+    });
+
+    const agodaRooms: MergedRoom[] = Array.from(agodaRoomMap.entries()).map(
+      ([room_id, room]) => ({
+        room_id,
+        room_name: room.room_name,
+        ota: "agoda" as const,
+        room_data: room,
+      })
+    );
+
+    const hgRooms: MergedRoom[] = Array.from(hgRoomMap.entries()).map(
+      ([id, room]) => ({
+        room_id: id,
+        room_name: room.room_name,
+        ota: "hyperguest" as const,
+        room_data: room,
+      })
+    );
+
+    return [...agodaRooms, ...hgRooms];
   };
 
   const clearSelection = () => {
     setSelectedCells(new Set());
-    setSelectionMode('none');
+    setSelectionMode("none");
   };
 
-  // Excel-like drag selection handlers
-  const handleMouseDown = (date: string, roomId: string, ota?: 'agoda' | 'hyperguest') => {
+  // ─────────────────────────────────────────────────────────────
+  // EDIT HANDLERS
+  // ─────────────────────────────────────────────────────────────
+  const handlePriceChange = (roomId: string, date: string, value: number) => {
+    setPriceEdits((prev) => ({
+      ...prev,
+      [roomId]: {
+        ...prev[roomId],
+        [date]: value,
+      },
+    }));
+  };
+
+  const handleInventoryChange = (
+    roomId: string,
+    date: string,
+    value: number
+  ) => {
+    setInventoryEdits((prev) => ({
+      ...prev,
+      [roomId]: {
+        ...prev[roomId],
+        [date]: value,
+      },
+    }));
+  };
+
+  const batchUpdateSelected = (value: number) => {
+    if (selectionMode === "price") {
+      const newPriceEdits = { ...priceEdits };
+      const selectedDates = new Set<string>();
+
+      // Update price edits for all selected price cells (Agoda + HyperGuest)
+      selectedCells.forEach((cellKey) => {
+        if (!cellKey.startsWith("price_")) return;
+
+        // cellKey format: "price_${roomId}_${date}"
+        const parts = cellKey.split("_");
+        if (parts.length < 3) return;
+
+        // Date is always the last segment (YYYY-MM-DD)
+        const date = parts[parts.length - 1];
+        // RoomId is everything between "price" and the date (can contain underscores for HyperGuest)
+        const roomId = parts.slice(1, -1).join("_");
+
+        selectedDates.add(date);
+
+        if (!newPriceEdits[roomId]) newPriceEdits[roomId] = {};
+        newPriceEdits[roomId][date] = value;
+      });
+
+      // Also apply the same price to all HyperGuest rooms for selected dates
+      if (selectedDates.size > 0 && calendarData) {
+        const allRooms = getAllRooms();
+        const hgRooms = allRooms.filter((r) => r.ota === "hyperguest");
+
+        selectedDates.forEach((date) => {
+          hgRooms.forEach((room) => {
+            if (!newPriceEdits[room.room_id]) newPriceEdits[room.room_id] = {};
+            newPriceEdits[room.room_id][date] = value;
+          });
+        });
+      }
+
+      setPriceEdits(newPriceEdits);
+    } else if (selectionMode === "availability") {
+      const newInventoryEdits = { ...inventoryEdits };
+
+      // Update availability for all selected availability cells (Agoda + HyperGuest)
+      selectedCells.forEach((cellKey) => {
+        if (!cellKey.startsWith("inventory_")) return;
+
+        // cellKey format: "inventory_${roomId}_${date}"
+        const parts = cellKey.split("_");
+        if (parts.length < 3) return;
+
+        // Date is always the last segment (YYYY-MM-DD)
+        const date = parts[parts.length - 1];
+        // RoomId is everything between "inventory" and the date (can contain underscores for HyperGuest)
+        const roomId = parts.slice(1, -1).join("_");
+
+        if (!newInventoryEdits[roomId]) newInventoryEdits[roomId] = {};
+        newInventoryEdits[roomId][date] = value;
+      });
+
+      setInventoryEdits(newInventoryEdits);
+    }
+  };
+
+  // ─────────────────────────────────────────────────────────────
+  // DRAG SELECTION HANDLERS
+  // ─────────────────────────────────────────────────────────────
+  const handleMouseDown = (
+    date: string,
+    roomId: string,
+    ota?: "agoda" | "hyperguest"
+  ) => {
     setIsDragging(true);
     setDragStart({ date, roomId, ota });
     setDragEnd({ date, roomId, ota });
   };
 
-  const handleMouseEnter = (date: string, roomId: string, ota?: 'agoda' | 'hyperguest') => {
+  const handleMouseEnter = (
+    date: string,
+    roomId: string,
+    ota?: "agoda" | "hyperguest"
+  ) => {
     if (isDragging && dragStart) {
       setDragEnd({ date, roomId, ota });
     }
@@ -562,440 +671,432 @@ export default function CalendarManagement() {
 
   const handleMouseUp = () => {
     if (isDragging && dragStart && dragEnd && calendarData) {
-      // Get all dates from calendar
-      const allDates = calendarData.agoda?.date_columns?.map(d => formatDate(d)) || [];
-      
-      // Get start and end date indices
+      const allDates = calendarData.agoda.date_columns.map((d) =>
+        formatDate(d)
+      );
       const startDateIndex = allDates.indexOf(dragStart.date);
       const endDateIndex = allDates.indexOf(dragEnd.date);
-      
+
       if (startDateIndex === -1 || endDateIndex === -1) {
         setIsDragging(false);
         setDragStart(null);
         setDragEnd(null);
         return;
       }
-      
-      // Determine date range
+
       const minDateIndex = Math.min(startDateIndex, endDateIndex);
       const maxDateIndex = Math.max(startDateIndex, endDateIndex);
       const dateRange = allDates.slice(minDateIndex, maxDateIndex + 1);
-      
-      // Get all room IDs based on selection type
-      let roomIds: Array<{id: string, ota?: 'agoda' | 'hyperguest'}> = [];
-      
-      const isBasePrice = dragStart.roomId === 'base';
-      const isAvailability = dragStart.ota === 'agoda' || dragStart.ota === 'hyperguest';
-      
-      // Check selection mode compatibility
-      if (selectionMode === 'none') {
-        if (isBasePrice) {
-          setSelectionMode('base');
-          roomIds = [{id: 'base'}];
-        } else if (isAvailability) {
-          setSelectionMode('availability');
-          // Get all rooms between start and end
-          const mergedRooms = getMergedRooms();
-          const startRoomIndex = mergedRooms.findIndex(r => 
-            (r.agoda?.agoda_room_id === dragStart.roomId) || 
-            (r.hyperguest?.hyperguest_room_id === dragStart.roomId)
-          );
-          const endRoomIndex = mergedRooms.findIndex(r => 
-            (r.agoda?.agoda_room_id === dragEnd.roomId) || 
-            (r.hyperguest?.hyperguest_room_id === dragEnd.roomId)
-          );
-          
-          if (startRoomIndex !== -1 && endRoomIndex !== -1) {
-            const minRoomIndex = Math.min(startRoomIndex, endRoomIndex);
-            const maxRoomIndex = Math.max(startRoomIndex, endRoomIndex);
-            const roomRange = mergedRooms.slice(minRoomIndex, maxRoomIndex + 1);
-            
-            roomRange.forEach(room => {
-              if (room.agoda) {
-                roomIds.push({id: room.agoda.agoda_room_id, ota: 'agoda'});
-              }
-            });
-          }
-        }
-      } else if (selectionMode === 'base' && !isBasePrice) {
-        toast.error("You can only select base prices when base price mode is active. Clear selection to change mode.");
-        setIsDragging(false);
-        setDragStart(null);
-        setDragEnd(null);
-        return;
-      } else if (selectionMode === 'availability' && !isAvailability) {
-        toast.error("You can only select availability when availability mode is active. Clear selection to change mode.");
-        setIsDragging(false);
-        setDragStart(null);
-        setDragEnd(null);
-        return;
-      } else if (selectionMode === 'base') {
-        roomIds = [{id: 'base'}];
-      } else if (selectionMode === 'availability') {
-        // Get all rooms between start and end
-        const mergedRooms = getMergedRooms();
-        const startRoomIndex = mergedRooms.findIndex(r => 
-          (r.agoda?.agoda_room_id === dragStart.roomId) || 
-          (r.hyperguest?.hyperguest_room_id === dragStart.roomId)
-        );
-        const endRoomIndex = mergedRooms.findIndex(r => 
-          (r.agoda?.agoda_room_id === dragEnd.roomId) || 
-          (r.hyperguest?.hyperguest_room_id === dragEnd.roomId)
-        );
-        
-        if (startRoomIndex !== -1 && endRoomIndex !== -1) {
-          const minRoomIndex = Math.min(startRoomIndex, endRoomIndex);
-          const maxRoomIndex = Math.max(startRoomIndex, endRoomIndex);
-          const roomRange = mergedRooms.slice(minRoomIndex, maxRoomIndex + 1);
-          
-          roomRange.forEach(room => {
-            if (room.agoda) {
-              roomIds.push({id: room.agoda.agoda_room_id, ota: 'agoda'});
-            }
+
+      const allRooms = getAllRooms();
+      const startRoomIndex = allRooms.findIndex(
+        (r) => r.room_id === dragStart.roomId
+      );
+      const endRoomIndex = allRooms.findIndex(
+        (r) => r.room_id === dragEnd.roomId
+      );
+
+      if (startRoomIndex !== -1 && endRoomIndex !== -1) {
+        const minRoomIndex = Math.min(startRoomIndex, endRoomIndex);
+        const maxRoomIndex = Math.max(startRoomIndex, endRoomIndex);
+        const roomRange = allRooms.slice(minRoomIndex, maxRoomIndex + 1);
+
+        const newSelection = new Set(selectedCells);
+        roomRange.forEach((room) => {
+          dateRange.forEach((date) => {
+            newSelection.add(
+              createCellKey(
+                date,
+                room.room_id,
+                selectionMode === "price" ? "price" : "inventory"
+              )
+            );
           });
-        }
-      }
-      
-      // Select all cells in the range
-      const newSelection = new Set(selectedCells);
-      roomIds.forEach(room => {
-        dateRange.forEach(date => {
-          const cellKey = createCellKey(date, room.id, room.ota);
-          newSelection.add(cellKey);
         });
-      });
-      
-      setSelectedCells(newSelection);
+
+        setSelectedCells(newSelection);
+      }
     }
-    
+
     setIsDragging(false);
     setDragStart(null);
     setDragEnd(null);
   };
 
-  // Helper to check if cell is in drag range
-  const isCellInDragRange = (date: string, roomId: string, ota?: 'agoda' | 'hyperguest') => {
+  const isCellInDragRange = (date: string, roomId: string) => {
     if (!isDragging || !dragStart || !dragEnd || !calendarData) return false;
-    
-    const allDates = calendarData.agoda?.date_columns?.map(d => formatDate(d)) || [];
+
+    const allDates = calendarData.agoda.date_columns.map((d) => formatDate(d));
     const currentDateIndex = allDates.indexOf(date);
     const startDateIndex = allDates.indexOf(dragStart.date);
     const endDateIndex = allDates.indexOf(dragEnd.date);
-    
-    if (currentDateIndex === -1 || startDateIndex === -1 || endDateIndex === -1) return false;
-    
+
+    if (currentDateIndex === -1 || startDateIndex === -1 || endDateIndex === -1)
+      return false;
+
     const minDateIndex = Math.min(startDateIndex, endDateIndex);
     const maxDateIndex = Math.max(startDateIndex, endDateIndex);
-    const isInDateRange = currentDateIndex >= minDateIndex && currentDateIndex <= maxDateIndex;
-    
+    const isInDateRange =
+      currentDateIndex >= minDateIndex && currentDateIndex <= maxDateIndex;
+
     if (!isInDateRange) return false;
-    
-    // Check room range
-    const isBasePrice = dragStart.roomId === 'base';
-    if (isBasePrice) {
-      return roomId === 'base';
-    }
-    
-    const mergedRooms = getMergedRooms();
-    const currentRoomIndex = mergedRooms.findIndex(r => 
-      (r.agoda?.agoda_room_id === roomId) || 
-      (r.hyperguest?.hyperguest_room_id === roomId)
+
+    const allRooms = getAllRooms();
+    const currentRoomIndex = allRooms.findIndex((r) => r.room_id === roomId);
+    const startRoomIndex = allRooms.findIndex(
+      (r) => r.room_id === dragStart.roomId
     );
-    const startRoomIndex = mergedRooms.findIndex(r => 
-      (r.agoda?.agoda_room_id === dragStart.roomId) || 
-      (r.hyperguest?.hyperguest_room_id === dragStart.roomId)
+    const endRoomIndex = allRooms.findIndex(
+      (r) => r.room_id === dragEnd.roomId
     );
-    const endRoomIndex = mergedRooms.findIndex(r => 
-      (r.agoda?.agoda_room_id === dragEnd.roomId) || 
-      (r.hyperguest?.hyperguest_room_id === dragEnd.roomId)
-    );
-    
-    if (currentRoomIndex === -1 || startRoomIndex === -1 || endRoomIndex === -1) return false;
-    
+
+    if (currentRoomIndex === -1 || startRoomIndex === -1 || endRoomIndex === -1)
+      return false;
+
     const minRoomIndex = Math.min(startRoomIndex, endRoomIndex);
     const maxRoomIndex = Math.max(startRoomIndex, endRoomIndex);
-    
+
     return currentRoomIndex >= minRoomIndex && currentRoomIndex <= maxRoomIndex;
   };
 
-  const batchUpdateSelected = (value: number) => {
-    const newBasePriceEdits = { ...basePriceEdits };
-    const newInventoryEdits = { ...inventoryEdits };
-
-    selectedCells.forEach(cellKey => {
-      if (cellKey.startsWith('base_')) {
-        const date = cellKey.replace('base_', '');
-        newBasePriceEdits[date] = value;
-      } else if (cellKey.startsWith('agoda_')) {
-        // For Agoda: agoda_roomId_date
-        const agodaPrefix = 'agoda_';
-        const withoutPrefix = cellKey.substring(agodaPrefix.length);
-        const lastUnderscoreIndex = withoutPrefix.lastIndexOf('_');
-        
-        if (lastUnderscoreIndex > 0) {
-          const roomId = withoutPrefix.substring(0, lastUnderscoreIndex);
-          const date = withoutPrefix.substring(lastUnderscoreIndex + 1);
-          
-          if (!newInventoryEdits.agoda[roomId]) {
-            newInventoryEdits.agoda[roomId] = {};
-          }
-          newInventoryEdits.agoda[roomId][date] = value;
-        }
-      } else if (cellKey.startsWith('hyperguest_')) {
-        // For HyperGuest: hyperguest_roomId_date
-        const hyperguestPrefix = 'hyperguest_';
-        const withoutPrefix = cellKey.substring(hyperguestPrefix.length);
-        const lastUnderscoreIndex = withoutPrefix.lastIndexOf('_');
-        
-        if (lastUnderscoreIndex > 0) {
-          const roomId = withoutPrefix.substring(0, lastUnderscoreIndex);
-          const date = withoutPrefix.substring(lastUnderscoreIndex + 1);
-          
-          if (!newInventoryEdits.hyperguest[roomId]) {
-            newInventoryEdits.hyperguest[roomId] = {};
-          }
-          newInventoryEdits.hyperguest[roomId][date] = value;
-        }
-      }
-    });
-
-    setBasePriceEdits(newBasePriceEdits);
-    setInventoryEdits(newInventoryEdits);
-  };
-
-  // Helper function to format date for API (YYYY-MM-DD)
-  const formatDateForAPI = (dateString: string) => {
-    // If the date is already in YYYY-MM-DD format, return as is
-    if (/^\d{4}-\d{2}-\d{2}$/.test(dateString)) {
-      return dateString;
-    }
-    
-    // If the date is in YYYY-Month-DD format, convert it
-    const parts = dateString.split('-');
-    if (parts.length === 3) {
-      const year = parts[0];
-      const month = parts[1];
-      const day = parts[2];
-      
-      // Convert month name to number
-      const monthMap: { [key: string]: string } = {
-        'January': '01', 'February': '02', 'March': '03', 'April': '04',
-        'May': '05', 'June': '06', 'July': '07', 'August': '08',
-        'September': '09', 'October': '10', 'November': '11', 'December': '12'
-      };
-      
-      const monthNumber = monthMap[month] || month;
-      return `${year}-${monthNumber}-${day.padStart(2, '0')}`;
-    }
-    
-    return dateString; 
-  };
-
-  // Save all changes
+  // ─────────────────────────────────────────────────────────────
+  // SAVE CHANGES - UPDATED FOR NEW API
+  // ─────────────────────────────────────────────────────────────
   const saveAllChanges = async () => {
     if (!calendarData) return;
 
     setSaving(true);
     try {
-      // Save base price changes
-      const priceUpdates = Object.entries(basePriceEdits).map(([date, basePrice]) => ({
-        date: formatDateForAPI(date),
-        basePrice
-      }));
+      // Build a union of all dates from both Agoda and HyperGuest so we send pricing for both
+      const agodaDates = (calendarData.agoda?.date_columns || []).map((d) =>
+        formatDate(d)
+      );
+      const hyperguestDates = (calendarData.hyperguest?.date_columns || []).map(
+        (d) => formatDate(d)
+      );
+      const allDatesSet = new Set<string>([...agodaDates, ...hyperguestDates]);
+      const allDates = Array.from(allDatesSet);
 
-      if (priceUpdates.length > 0) {
-        await axios.put(
-          `admin/properties/${propertyId}/pricing/bulk`,
-          { pricing: priceUpdates }
-        );
-        toast.success("Base prices updated successfully!");
+      // Prepare pricing updates for new bulk API
+      const pricingPayload: Array<{
+        date: string;
+        agoda_rooms: Array<{ agoda_room_id: string; price: number }>;
+        hyperguest_rooms: Array<{
+          room_type_code: string;
+          rate_plan_code: string;
+          price: number;
+        }>;
+      }> = [];
+
+      allDates.forEach((date) => {
+        const dateUpdate: {
+          date: string;
+          agoda_rooms: Array<{ agoda_room_id: string; price: number }>;
+          hyperguest_rooms: Array<{
+            room_type_code: string;
+            rate_plan_code: string;
+            price: number;
+          }>;
+        } = { date, agoda_rooms: [], hyperguest_rooms: [] };
+
+        // Collect price updates for both Agoda and HyperGuest
+        Object.entries(priceEdits).forEach(([roomId, roomDates]) => {
+          const priceForDate = roomDates[date];
+          if (!priceForDate) return;
+
+          if (roomId.includes("_")) {
+            // HyperGuest room: room_id is `${room_type_code}_${rate_plan_code}`
+            const [room_type_code, rate_plan_code] = roomId.split("_");
+
+            // Only send HyperGuest pricing when that room actually exists for this date
+            const hgDateCol = calendarData.hyperguest?.date_columns.find(
+              (col) => formatDate(col) === date
+            );
+            const hasRoomOnDate = hgDateCol?.room_inventory?.some(
+              (r) =>
+                r.room_type_code === room_type_code &&
+                (r.rate_plan_code || "CP") === (rate_plan_code || "CP")
+            );
+
+            if (hasRoomOnDate) {
+              dateUpdate.hyperguest_rooms.push({
+                room_type_code,
+                rate_plan_code: rate_plan_code || "CP",
+                price: priceForDate,
+              });
+            }
+          } else {
+            // Agoda room: roomId is agoda_room_id
+            dateUpdate.agoda_rooms.push({
+              agoda_room_id: roomId,
+              price: priceForDate,
+            });
+          }
+        });
+
+        if (
+          dateUpdate.agoda_rooms.length > 0 ||
+          dateUpdate.hyperguest_rooms.length > 0
+        ) {
+          pricingPayload.push(dateUpdate);
+        }
+      });
+
+      // Send pricing updates if any
+      if (pricingPayload.length > 0) {
+        try {
+          // API expects an array of { date, agoda_rooms, hyperguest_rooms }
+          // [
+          //   {
+          //     "date": "2026-12-20",
+          //     "agoda_rooms": [{ "agoda_room_id": "1217830716", "price": 2200 }],
+          //     "hyperguest_rooms": [
+          //       { "room_type_code": "Room-02", "rate_plan_code": "CP", "price": 200 }
+          //     ]
+          //   }
+          // ]
+          await axios.put(
+            `/admin/properties/${propertyId}/pricing/bulk`,
+            pricingPayload
+          );
+          toast.success("Pricing updated successfully!");
+        } catch (error: any) {
+          console.error("Pricing update error:", error);
+          const errorMessage =
+            error.response?.data?.MESSAGE ||
+            error.response?.data?.message ||
+            (error.code === "ERR_NETWORK"
+              ? "Network error: Please check your internet connection and try again."
+              : error.message) ||
+            "Failed to update pricing. Please try again.";
+          toast.error(errorMessage);
+          setSaving(false);
+          return; // Exit early if pricing update fails
+        }
       }
 
-      // Save inventory changes
-      const inventoryUpdates: any[] = [];
-      
-      Object.entries(inventoryEdits.agoda).forEach(([roomId, cells]) => {
-        Object.entries(cells).forEach(([date, available_rooms]) => {
-          const room = calendarData.agoda.date_columns[0]?.room_inventory.find((r: any) => r.agoda_room_id === roomId);
-          if (room) {
-            inventoryUpdates.push({
-              room_class: room.room_class,
-              date: formatDateForAPI(date),
+      // Prepare availability updates (Agoda + HyperGuest)
+      const availabilityUpdates: Array<any> = [];
+
+      Object.entries(inventoryEdits).forEach(([roomId, dates]) => {
+        Object.entries(dates).forEach(([date, available_rooms]) => {
+          if (roomId.includes("_")) {
+            // HyperGuest room: room_id is `${room_type_code}_${rate_plan_code}`
+            const [room_type_code, rate_plan_code] = roomId.split("_");
+
+            // Only send HyperGuest availability when that room actually exists for this date
+            const hgDateCol = calendarData.hyperguest?.date_columns.find(
+              (col) => formatDate(col) === date
+            );
+            const hasRoomOnDate = hgDateCol?.room_inventory?.some(
+              (r) =>
+                r.room_type_code === room_type_code &&
+                (r.rate_plan_code || "CP") === (rate_plan_code || "CP")
+            );
+
+            if (hasRoomOnDate) {
+              availabilityUpdates.push({
+                room_type_code,
+                rate_plan_code: rate_plan_code || "CP",
+                date,
+                available_rooms,
+                closed: false,
+                ctd: false,
+                cta: false,
+              });
+            }
+          } else {
+            // Agoda room
+            availabilityUpdates.push({
+              agoda_room_id: roomId,
+              date,
               available_rooms,
               closed: false,
               ctd: false,
-              cta: false
+              cta: false,
             });
           }
         });
       });
 
-      Object.entries(inventoryEdits.hyperguest).forEach(([roomId, cells]) => {
-        Object.entries(cells).forEach(([date, available_rooms]) => {
-          const room = calendarData.hyperguest.date_columns[0]?.room_inventory.find((r: any) => r.hyperguest_room_id === roomId);
-          if (room) {
-            inventoryUpdates.push({
-              room_class: room.room_class,
-              date: formatDateForAPI(date),
-              available_rooms,
-              closed: false,
-              ctd: false,
-              cta: false
-            });
-          }
-        });
-      });
-
-      if (inventoryUpdates.length > 0) {
-        await axios.put(
-          "admin/availability/bulk-update",
-          { 
-            property_id: propertyId, 
-            updates: inventoryUpdates 
-          }
-        );
-        toast.success("Inventory updated successfully!");
+      // Send availability updates if any
+      if (availabilityUpdates.length > 0) {
+        try {
+          await axios.put("/admin/availability/bulk-update", {
+            property_id: propertyId,
+            updates: availabilityUpdates,
+          });
+          toast.success("Availability updated successfully!");
+        } catch (error: any) {
+          console.error("Availability update error:", error);
+          const errorMessage =
+            error.response?.data?.MESSAGE ||
+            error.response?.data?.message ||
+            (error.code === "ERR_NETWORK"
+              ? "Network error: Please check your internet connection and try again."
+              : error.message) ||
+            "Failed to update availability. Please try again.";
+          toast.error(errorMessage);
+          setSaving(false);
+          return; // Exit early if availability update fails
+        }
       }
+
+      // Clear edits and selections only if all requests succeeded
+      setPriceEdits({});
+      setInventoryEdits({});
+      setSelectedCells(new Set());
+      setSelectionMode("none");
 
       // Refresh data
       await fetchCalendar();
-      
     } catch (error: any) {
+      // Fallback error handler for any unexpected errors
       console.error("Save error:", error);
-      toast.error(error.response?.data?.MESSAGE || "Failed to save changes.");
+      const errorMessage =
+        error.response?.data?.MESSAGE ||
+        error.response?.data?.message ||
+        (error.code === "ERR_NETWORK"
+          ? "Network error: Please check your internet connection and try again."
+          : error.message) ||
+        "Failed to save changes. Please try again.";
+      toast.error(errorMessage);
     } finally {
       setSaving(false);
     }
   };
 
-  const hasChanges = Object.keys(basePriceEdits).length > 0 || 
-    Object.keys(inventoryEdits.agoda).length > 0 || 
-    Object.keys(inventoryEdits.hyperguest).length > 0;
-
+  const hasChanges =
+    Object.keys(priceEdits).length > 0 ||
+    Object.keys(inventoryEdits).length > 0;
   const selectedCount = selectedCells.size;
 
-  // Custom styles for react-select
+  // ─────────────────────────────────────────────────────────────
+  // CUSTOM SELECT STYLES
+  // ─────────────────────────────────────────────────────────────
   const customSelectStyles = {
     control: (provided: any, state: any) => ({
       ...provided,
-      minHeight: '42px',
-      borderColor: state.isFocused ? '#3b82f6' : '#d1d5db',
-      boxShadow: state.isFocused ? '0 0 0 1px #3b82f6' : 'none',
-      '&:hover': {
-        borderColor: state.isFocused ? '#3b82f6' : '#9ca3af'
-      }
+      minHeight: "42px",
+      borderColor: state.isFocused ? "#3b82f6" : "#d1d5db",
+      boxShadow: state.isFocused ? "0 0 0 1px #3b82f6" : "none",
+      "&:hover": {
+        borderColor: state.isFocused ? "#3b82f6" : "#9ca3af",
+      },
     }),
     placeholder: (provided: any) => ({
       ...provided,
-      color: '#9ca3af',
-      fontSize: '14px'
+      color: "#9ca3af",
+      fontSize: "14px",
     }),
     singleValue: (provided: any) => ({
       ...provided,
-      color: '#111827',
-      fontSize: '14px'
+      color: "#111827",
+      fontSize: "14px",
     }),
     option: (provided: any, state: any) => ({
       ...provided,
-      backgroundColor: state.isSelected 
-        ? '#f3f4f6' 
-        : state.isFocused 
-          ? '#f9fafb' 
-          : 'white',
-      color: state.isSelected ? '#111827' : '#111827',
-      fontSize: '14px',
-      padding: '8px 12px'
+      backgroundColor: state.isSelected
+        ? "#f3f4f6"
+        : state.isFocused
+        ? "#f9fafb"
+        : "white",
+      color: state.isSelected ? "#111827" : "#111827",
+      fontSize: "14px",
+      padding: "8px 12px",
     }),
     menu: (provided: any) => ({
       ...provided,
-      zIndex: 9999
-    })
+      zIndex: 9999,
+    }),
   };
 
-  // Helper function to merge Agoda and HyperGuest rooms by room_class
-  const getMergedRooms = () => {
-    if (!calendarData) return [];
-    
-    const agodaRooms = calendarData.agoda?.date_columns?.[0]?.room_inventory || [];
-    const hyperguestRooms = calendarData.hyperguest?.date_columns?.[0]?.room_inventory || [];
-    
-    // Get all unique room classes
-    const roomClasses = new Set([
-      ...agodaRooms.map((room: any) => room.room_class),
-      ...hyperguestRooms.map((room: any) => room.room_class)
-    ]);
-    
-    // Merge rooms by room_class
-    return Array.from(roomClasses).map(roomClass => {
-      const agodaRoom = agodaRooms.find((room: any) => room.room_class === roomClass);
-      const hyperguestRoom = hyperguestRooms.find((room: any) => room.room_class === roomClass);
-      
-      return {
-        room_class: roomClass,
-        agoda: agodaRoom,
-        hyperguest: hyperguestRoom
-      };
-    });
-  };
-
-  // Show full page shimmer only on initial load
+  // ═════════════════════════════════════════════════════════════
+  // RENDER - SHIMMER LOADING STATE
+  // ═════════════════════════════════════════════════════════════
   if (initialLoading) {
-  return (
-      <div className="mx-auto space-y-6 p-2 md:p-4">
-        <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
-          <div>
-            <Shimmer className="h-8 w-48 mb-2" />
-            <Shimmer className="h-4 w-64" />
-          </div>
-          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
-            <Shimmer className="h-10 w-full sm:w-[300px]" />
-            <Shimmer className="h-10 w-32" />
-        </div>
-      </div>
-
-        {/* Table shimmer */}
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-gray-200">
-              <thead className="bg-gray-50">
-                <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Base Price</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Agoda Availability</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">HyperGuest Availability</th>
-                </tr>
-              </thead>
-              <tbody className="bg-white divide-y divide-gray-200">
-                <ShimmerTableRows />
-              </tbody>
-            </table>
-              </div>
+    return (
+      <PageTransitionWrapper>
+        <div className="mx-auto space-y-6 p-2 md:p-4">
+          <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+            <div>
+              <Shimmer className="h-8 w-48 mb-2" />
+              <Shimmer className="h-4 w-64" />
+            </div>
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
+              <Shimmer className="h-10 w-full sm:w-[300px]" />
+              <Shimmer className="h-10 w-32" />
             </div>
           </div>
+          <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="min-w-full divide-y divide-gray-200">
+                <thead className="bg-gray-50">
+                  <tr>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Room
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Date 1
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Date 2
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Date 3
+                    </th>
+                  </tr>
+                </thead>
+                <tbody className="bg-white divide-y divide-gray-200">
+                  <ShimmerTableRows />
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </PageTransitionWrapper>
     );
   }
 
+  // ═════════════════════════════════════════════════════════════
+  // RENDER - MAIN UI
+  // ═════════════════════════════════════════════════════════════
   return (
     <PageTransitionWrapper>
-      <div className={`mx-auto space-y-6 p-2 md:p-4 ${isDragging ? 'select-none' : ''}`}>
-        {/* Header */}
+      <div
+        className={`mx-auto space-y-6 p-2 md:p-4 ${
+          isDragging ? "select-none" : ""
+        }`}
+      >
+        {/* ──────────────────────────────────────────────────────── */}
+        {/* HEADER */}
+        {/* ──────────────────────────────────────────────────────── */}
         <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
           <div>
-            <h1 className="text-2xl font-semibold text-gray-900">Calendar Management</h1>
+            <h1 className="text-2xl font-semibold text-gray-900">
+              Calendar Management
+            </h1>
             <p className="mt-1 text-sm text-gray-600">
-              Manage availability and pricing across Agoda and HyperGuest platforms
+              Manage pricing and availability across Agoda and HyperGuest
+              platforms
             </p>
-            {/* Property Details */}
             {calendarData && (
               <div className="mt-3 md:flex hidden md:flex-row gap-4">
-                <div className="flex items-center gap-2 ">
-                  <span className="text-sm font-medium text-gray-700">Property Name:</span>
-                  <span className="text-sm text-gray-900">{calendarData.property_name}</span>
-                  <span className="text-xs text-gray-500">(ID: {calendarData.property_id})</span>
+                <div className="flex items-center gap-2">
+                  <span className="text-sm font-medium text-gray-700">
+                    Property:
+                  </span>
+                  <span className="text-sm text-gray-900">
+                    {calendarData.property_name}
+                  </span>
+                  <span className="text-xs text-gray-500">
+                    ID: {calendarData.property_id}
+                  </span>
                 </div>
               </div>
             )}
           </div>
+
           <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
             {hasChanges && (
               <Button
@@ -1016,13 +1117,15 @@ export default function CalendarManagement() {
                 onClick={clearSelection}
                 className="whitespace-nowrap"
               >
-                Clear Selection
+                Clear Selection ({selectedCount})
               </Button>
             )}
           </div>
-      </div>
+        </div>
 
-        {/* Filter Controls */}
+        {/* ──────────────────────────────────────────────────────── */}
+        {/* FILTER CONTROLS */}
+        {/* ──────────────────────────────────────────────────────── */}
         <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 md:p-6">
           <div className="flex flex-col md:flex-row gap-4 md:items-end md:gap-2">
             <div className="flex-1 md:max-w-sm">
@@ -1031,9 +1134,16 @@ export default function CalendarManagement() {
                 Agoda Property ID
               </label>
               <Select
+                id="calendar-property-select"
                 instanceId="calendar-property-select"
-                value={propertyOptions.find(option => option.value === propertyId) || null}
-                onChange={(selectedOption) => setPropertyId(selectedOption?.value || "")}
+                value={
+                  propertyOptions.find(
+                    (option) => option.value === propertyId
+                  ) || null
+                }
+                onChange={(selectedOption) =>
+                  setPropertyId(selectedOption?.value || "")
+                }
                 options={propertyOptions}
                 placeholder="Select Property..."
                 isSearchable
@@ -1043,7 +1153,7 @@ export default function CalendarManagement() {
                 classNamePrefix="react-select"
               />
             </div>
-            
+
             <div className="flex flex-col md:flex-row gap-4">
               <div className="flex-1">
                 <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -1055,32 +1165,37 @@ export default function CalendarManagement() {
                   variant="secondary"
                   className="w-full justify-start"
                   onClick={() => {
-                    // Prime temp values when opening the modal
                     setTempStartDate(startDate);
                     setTempEndDate(endDate);
                     setIsDateModalOpen(true);
                   }}
                 >
-                  {`${formatDate(startDate)} to ${formatDate(endDate)}`}
+                  {formatDate(startDate)} → {formatDate(endDate)}
+                </Button>
+              </div>
+
+              <div className="flex flex-col md:flex-row gap-2 md:pb-1">
+                <Button
+                  variant="secondary"
+                  leftIcon={
+                    <RefreshCw
+                      className={`h-4 w-4 ${loading ? "animate-spin" : ""}`}
+                    />
+                  }
+                  onClick={fetchCalendar}
+                  disabled={loading || !propertyId.trim()}
+                  className="flex-1 md:w-auto"
+                >
+                  Refresh
                 </Button>
               </div>
             </div>
-
-            <div className="flex flex-col md:flex-row gap-2 md:pb-1">
-              <Button
-                variant="secondary"
-                leftIcon={<RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />}
-                onClick={fetchCalendar}
-                disabled={loading || !propertyId.trim()}
-                className="flex-1 md:w-auto md:h-auto"
-              >
-                Refresh
-              </Button>
-            </div>
-          </div>  
+          </div>
         </div>
-        
-        {/* Date Range Modal */}
+
+        {/* ──────────────────────────────────────────────────────── */}
+        {/* DATE RANGE MODAL */}
+        {/* ──────────────────────────────────────────────────────── */}
         <Modal
           isOpen={isDateModalOpen}
           onClose={() => setIsDateModalOpen(false)}
@@ -1108,15 +1223,15 @@ export default function CalendarManagement() {
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
-              <p className="text-sm font-medium text-gray-700 mb-2">Start Date</p>
+              <p className="text-sm font-medium text-gray-700 mb-2">
+                Start Date
+              </p>
               <DatePicker
                 selected={tempStartDate}
                 onChange={(date: Date | null) => {
                   if (date) {
                     setTempStartDate(date);
-                    if (tempEndDate < date) {
-                      setTempEndDate(date);
-                    }
+                    if (tempEndDate < date) setTempEndDate(date);
                   }
                 }}
                 selectsStart
@@ -1129,11 +1244,7 @@ export default function CalendarManagement() {
               <p className="text-sm font-medium text-gray-700 mb-2">End Date</p>
               <DatePicker
                 selected={tempEndDate}
-                onChange={(date: Date | null) => {
-                  if (date) {
-                    setTempEndDate(date);
-                  }
-                }}
+                onChange={(date: Date | null) => date && setTempEndDate(date)}
                 selectsEnd
                 endDate={tempEndDate}
                 minDate={tempStartDate}
@@ -1142,596 +1253,540 @@ export default function CalendarManagement() {
             </div>
           </div>
         </Modal>
-            
-        {/* Bulk Operations */}
+
+        {/* ──────────────────────────────────────────────────────── */}
+        {/* BULK OPERATIONS */}
+        {/* ──────────────────────────────────────────────────────── */}
         {calendarData && (
           <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
             <div className="flex flex-col gap-4">
-              {/* Bulk Select Options */}
               <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
                 <div className="flex flex-col md:flex-row md:items-center gap-2">
-                <span className="text-sm font-medium text-gray-700">Bulk Select:</span>
+                  <span className="text-sm font-medium text-gray-700">
+                    Bulk Select:
+                  </span>
                   <Button
                     variant="secondary"
                     size="sm"
                     onClick={() => {
-                      if (!calendarData) return;
-                      
-                      const dates = calendarData.agoda?.date_columns?.map(d => formatDate(d)) || [];
-                      const allBaseCells = dates.map(date => createCellKey(date, 'base'));
-                      const allBaseSelected = allBaseCells.every(cellKey => selectedCells.has(cellKey));
-                      
-                      if (allBaseSelected) {
-                        // Unselect all base price cells
+                      const allRooms = getAllRooms();
+                      const dates = calendarData.agoda.date_columns.map((d) =>
+                        formatDate(d)
+                      );
+                      const allPriceCells = allRooms.flatMap((room) =>
+                        dates.map((date) =>
+                          createCellKey(date, room.room_id, "price")
+                        )
+                      );
+                      const allSelected = allPriceCells.every((cell) =>
+                        selectedCells.has(cell)
+                      );
+
+                      if (allSelected) {
                         const newSelection = new Set(selectedCells);
-                        allBaseCells.forEach(cellKey => {
-                          newSelection.delete(cellKey);
-                        });
+                        allPriceCells.forEach((cell) =>
+                          newSelection.delete(cell)
+                        );
                         setSelectedCells(newSelection);
-                        // Reset mode if no cells selected
-                        if (newSelection.size === 0) {
-                          setSelectionMode('none');
-                        }
+                        if (newSelection.size === 0) setSelectionMode("none");
                       } else {
-                        // Set mode to base first
-                        setSelectionMode('base');
-                        
-                        // Select all base price cells
-                        const newSelection = new Set(selectedCells);
-                        dates.forEach(date => {
-                          newSelection.add(createCellKey(date, 'base'));
+                        // When bulk-selecting prices, clear all availability selections
+                        setSelectionMode("price");
+                        setSelectedCells((prev) => {
+                          const base = new Set<string>();
+                          prev.forEach((key) => {
+                            if (key.startsWith("price_")) {
+                              base.add(key);
+                            }
+                          });
+                          allPriceCells.forEach((cell) => base.add(cell));
+                          return base;
                         });
-                        setSelectedCells(newSelection);
                       }
                     }}
                     leftIcon={<CheckSquare className="h-4 w-4" />}
                     className="flex-1 sm:flex-none whitespace-nowrap"
                   >
                     {(() => {
-                      if (!calendarData) return "Base Price";
-                      const dates = calendarData.agoda?.date_columns?.map(d => formatDate(d)) || [];
-                      const allBaseCells = dates.map(date => createCellKey(date, 'base'));
-                      const allBaseSelected = allBaseCells.every(cellKey => selectedCells.has(cellKey));
-                      return allBaseSelected ? "Unselect Base Price" : "Base Price";
+                      const allRooms = getAllRooms();
+                      const dates = calendarData.agoda.date_columns.map((d) =>
+                        formatDate(d)
+                      );
+                      const allPriceCells = allRooms.flatMap((room) =>
+                        dates.map((date) =>
+                          createCellKey(date, room.room_id, "price")
+                        )
+                      );
+                      const allSelected = allPriceCells.every((cell) =>
+                        selectedCells.has(cell)
+                      );
+                      return allSelected
+                        ? "Unselect All Prices"
+                        : "Select All Prices";
                     })()}
                   </Button>
+
                   <Button
                     variant="secondary"
                     size="sm"
                     onClick={() => {
-                      if (!calendarData) return;
-                      
-                      const dates = calendarData.agoda?.date_columns?.map(d => formatDate(d)) || [];
-                      const allAvailabilityCells = new Set();
-                      
-                      // Get all Agoda rooms
-                      const agodaRooms = calendarData.agoda?.date_columns?.[0]?.room_inventory || [];
-                      agodaRooms.forEach((room: any) => {
-                        dates.forEach(date => {
-                          allAvailabilityCells.add(createCellKey(date, room.agoda_room_id, 'agoda'));
-                        });
-                      });
-                      
-                      // Get all HyperGuest rooms
-                      const hyperguestRooms = calendarData.hyperguest?.date_columns?.[0]?.room_inventory || [];
-                      hyperguestRooms.forEach((room: any) => {
-                        dates.forEach(date => {
-                          allAvailabilityCells.add(createCellKey(date, room.hyperguest_room_id, 'hyperguest'));
-                        });
-                      });
-                      
-                      const allAvailabilitySelected = Array.from(allAvailabilityCells).every(cellKey => selectedCells.has(cellKey as string));
-                      
-                      if (allAvailabilitySelected) {
-                        // Unselect all availability cells
+                      const allRooms = getAllRooms();
+                      const dates = calendarData.agoda.date_columns.map((d) =>
+                        formatDate(d)
+                      );
+                      const allInventoryCells = allRooms.flatMap((room) =>
+                        dates.map((date) =>
+                          createCellKey(date, room.room_id, "inventory")
+                        )
+                      );
+                      const allSelected = allInventoryCells.every((cell) =>
+                        selectedCells.has(cell)
+                      );
+
+                      if (allSelected) {
                         const newSelection = new Set(selectedCells);
-                        allAvailabilityCells.forEach(cellKey => {
-                          newSelection.delete(cellKey as string);
-                        });
+                        allInventoryCells.forEach((cell) =>
+                          newSelection.delete(cell)
+                        );
                         setSelectedCells(newSelection);
-                        // Reset mode if no cells selected
-                        if (newSelection.size === 0) {
-                          setSelectionMode('none');
-                        }
+                        if (newSelection.size === 0) setSelectionMode("none");
                       } else {
-                        // Set mode to availability first
-                        setSelectionMode('availability');
-                        
-                        // Select all Agoda and HyperGuest cells in one operation
-                        const newSelection = new Set(selectedCells);
-                        
-                        // Select all Agoda rooms
-                        agodaRooms.forEach((room: any) => {
-                          dates.forEach(date => {
-                            newSelection.add(createCellKey(date, room.agoda_room_id, 'agoda'));
+                        // When bulk-selecting availability, clear all price selections
+                        setSelectionMode("availability");
+                        setSelectedCells((prev) => {
+                          const base = new Set<string>();
+                          prev.forEach((key) => {
+                            if (key.startsWith("inventory_")) {
+                              base.add(key);
+                            }
                           });
+                          allInventoryCells.forEach((cell) => base.add(cell));
+                          return base;
                         });
-                        
-                        // Select all HyperGuest rooms
-                        hyperguestRooms.forEach((room: any) => {
-                          dates.forEach(date => {
-                            newSelection.add(createCellKey(date, room.hyperguest_room_id, 'hyperguest'));
-                          });
-                        });
-                        
-                        setSelectedCells(newSelection);
                       }
                     }}
                     leftIcon={<CheckSquare className="h-4 w-4" />}
                     className="flex-1 sm:flex-none whitespace-nowrap"
                   >
                     {(() => {
-                      if (!calendarData) return "Availability";
-                      const dates = calendarData.agoda?.date_columns?.map(d => formatDate(d)) || [];
-                      const allAvailabilityCells = new Set();
-                      
-                      // Get all Agoda rooms
-                      const agodaRooms = calendarData.agoda?.date_columns?.[0]?.room_inventory || [];
-                      agodaRooms.forEach((room: any) => {
-                        dates.forEach(date => {
-                          allAvailabilityCells.add(createCellKey(date, room.agoda_room_id, 'agoda'));
-                        });
-                      });
-                      
-                      // Get all HyperGuest rooms
-                      const hyperguestRooms = calendarData.hyperguest?.date_columns?.[0]?.room_inventory || [];
-                      hyperguestRooms.forEach((room: any) => {
-                        dates.forEach(date => {
-                          allAvailabilityCells.add(createCellKey(date, room.hyperguest_room_id, 'hyperguest'));
-                        });
-                      });
-                      
-                      const allAvailabilitySelected = Array.from(allAvailabilityCells).every(cellKey => selectedCells.has(cellKey as string));
-                      return allAvailabilitySelected ? "Unselect Availability" : "Availability";
+                      const allRooms = getAllRooms();
+                      const dates = calendarData.agoda.date_columns.map((d) =>
+                        formatDate(d)
+                      );
+                      const allInventoryCells = allRooms.flatMap((room) =>
+                        dates.map((date) =>
+                          createCellKey(date, room.room_id, "inventory")
+                        )
+                      );
+                      const allSelected = allInventoryCells.every((cell) =>
+                        selectedCells.has(cell)
+                      );
+                      return allSelected
+                        ? "Unselect All Availability"
+                        : "Select All Availability";
                     })()}
                   </Button>
                 </div>
-              {/* Selection Actions */}
-              {selectedCount > 0 && (
-                <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 pt-3 border-t border-gray-200 md:border-t-0 md:pt-0">
-                  <div className="text-sm text-gray-600 text-center sm:text-left">
-                    {selectedCount} cells selected
-                    {selectionMode !== 'none' && (
-                      <span className={`ml-2 px-2 py-1 rounded text-xs font-medium ${
-                        selectionMode === 'base' 
-                          ? 'bg-blue-100 text-blue-800' 
-                          : 'bg-green-100 text-green-800'
-                      }`}>
-                        {selectionMode === 'base' ? 'Base Price Mode' : 'Availability Mode'}
-                      </span>
-                    )}
+
+                {selectedCount > 0 && (
+                  <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 pt-3 border-t border-gray-200 md:border-t-0 md:pt-0">
+                    <div className="text-sm text-gray-600 text-center sm:text-left">
+                      {selectedCount} cells selected
+                      {selectionMode !== "none" && (
+                        <span className="ml-2 px-2 py-1 rounded text-xs font-medium">
+                          {selectionMode === "price" ? (
+                            <span className="bg-blue-100 text-blue-800">
+                              Price Mode
+                            </span>
+                          ) : (
+                            <span className="bg-green-100 text-green-800">
+                              Availability Mode
+                            </span>
+                          )}
+                        </span>
+                      )}
+                    </div>
+                    <div className="flex flex-col md:flex-row items-center gap-2">
+                      <Input
+                        type="number"
+                        placeholder="Set value"
+                        className="w-full md:w-auto"
+                        onChange={(e) =>
+                          batchUpdateSelected(Number(e.target.value))
+                        }
+                      />
+                    </div>
                   </div>
-                  <div className="flex flex-col md:flex-row items-center gap-2">
-                    <Input
-                      type="number"
-                      placeholder="Set value"
-                      className="w-full md:w-auto "
-                      onChange={e => batchUpdateSelected(Number(e.target.value))} 
-                    />
-                  </div>
-                </div>
-              )}
+                )}
               </div>
-              
             </div>
           </div>
         )}
 
-        {/* Calendar Table */}
+        {/* ──────────────────────────────────────────────────────── */}
+        {/* CALENDAR TABLE */}
+        {/* ──────────────────────────────────────────────────────── */}
         {loading ? (
           <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-12">
             <div className="flex items-center justify-center">
               <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-              <span className="ml-3 text-gray-600">Loading calendar data...</span>
-                </div>
-              </div>
+              <span className="ml-3 text-gray-600">
+                Loading calendar data...
+              </span>
+            </div>
+          </div>
         ) : calendarData ? (
           <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
-            {/* Mobile View - Responsive Table */}
-            <div className="block md:hidden">
-              <div className="p-3">
-                {/* Mobile Header */}
-                <div className="text-center mb-4 p-4 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-lg border border-blue-200">
-                  <div className="flex items-center justify-center gap-2 text-sm">
-                    <span className="text-gray-900 font-semibold">{calendarData.property_name}</span>
-                  </div>
-                </div>
-
-                {/* Mobile Table Container */}
-                <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
-                  {/* Table Header */}
-                  <div className="bg-gray-50 px-3 py-2 border-b border-gray-200">
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm font-semibold text-gray-700">Room Availability</span>
-                      <div className="flex items-center gap-2">
-                        <div className="flex items-center gap-1">
-                          <div className="w-3 h-3 bg-blue-500 rounded"></div>
-                          <span className="text-xs text-gray-600">Agoda</span>
-                        </div>
-                        <div className="flex items-center gap-1">
-                          <div className="w-3 h-3 bg-green-500 rounded"></div>
-                          <span className="text-xs text-gray-600">HyperGuest</span>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Mobile Table */}
-                  <div className="overflow-x-auto">
-                    <table className="w-full">
-                      <thead className="bg-gray-50">
-                        <tr>
-                          <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider sticky left-0 bg-gray-50 z-10 min-w-[120px]">
-                            Room / Date
-                          </th>
-                          {calendarData.agoda.date_columns.map((d: any) => {
-                            const isFullySelected = isColumnFullySelected(d);
-                            return (
-                              <th key={d.date} className="px-2 py-2 text-center text-xs font-medium text-gray-500 min-w-[80px]">
-                                <div className="flex flex-col items-center">
-                                  <span className="font-semibold text-gray-900">{d.day}</span>
-                                  <span className="text-gray-400 text-xs">{d.date}/{d.month}</span>
-                                  <button
-                                    onClick={() => isFullySelected ? unselectColumn(d) : selectColumn(d)}
-                                    className={`mt-1 text-xs font-medium transition-colors duration-200 px-2 py-1 rounded ${
-                                      isFullySelected 
-                                        ? 'bg-red-100 text-red-700' 
-                                        : 'bg-blue-100 text-blue-700'
-                                    }`}
-                                  >
-                                    {isFullySelected ? 'Unselect' : 'Select'}
-                                  </button>
-                                </div>
-                              </th>
-                            );
-                          })}
-                        </tr>
-                      </thead>
-                      <tbody className="bg-white divide-y divide-gray-200">
-                        {/* Base Price Row */}
-                        <tr className="bg-blue-50">
-                          <td className="px-3 py-3 text-sm font-medium text-gray-900 sticky left-0 bg-blue-50 z-10">
-                            <div className="flex items-center gap-2">
-                              <Percent className="h-4 w-4 text-blue-600" />
-                              <span>Base Price</span>
-                              <button
-                                onClick={() => isRowFullySelected('base') ? unselectRow('base') : selectRow('base')}
-                                className={`ml-1 text-xs font-medium transition-colors duration-200 ${
-                                  isRowFullySelected('base') 
-                                    ? 'text-red-600' 
-                                    : 'text-blue-600'
-                                }`}
-                              >
-                                {isRowFullySelected('base') ? 'Unselect' : 'Select'}
-                              </button>
-                            </div>
-                          </td>
-                          {calendarData.agoda.date_columns.map((d: any) => {
-                            const date = formatDate(d);
-                            const isSelected = isCellSelected(date, 'base');
-                            return (
-                              <td key={d.date} className="px-2 py-3 text-center">
-                                <div className="flex flex-col items-center gap-1">
-                                  <Input
-                                    type="number"
-                                    className="w-12 text-center text-sm h-8"
-                                    value={
-                                      (basePriceEdits[date] ?? d.base_room_rate ?? "").toString()
-                                    }
-                                    onChange={e =>
-                                      handleBasePriceChange(date, Number(e.target.value))
-                                    }
-                                  />
-                                  <button
-                                    onClick={() => toggleCellSelection(date, 'base')}
-                                    className={`p-1 rounded transition-colors duration-200 ${
-                                      isSelected 
-                                        ? 'text-blue-600 bg-blue-100' 
-                                        : 'text-gray-400 hover:text-gray-600 hover:bg-gray-100'
-                                    }`}
-                                  >
-                                    {isSelected ? (
-                                      <CheckSquare className="h-3 w-3" />
-                                    ) : (
-                                      <Square className="h-3 w-3" />
-                                    )}
-                                  </button>
-                                </div>
-                              </td>
-                            );
-                          })}
-                        </tr>
-
-                        {/* Room Availability Rows */}
-                        {getMergedRooms().map((mergedRoom: any) => (
-                          <tr key={mergedRoom.room_class} className="hover:bg-gray-50">
-                            <td className="px-3 py-3 text-sm font-medium text-gray-900 sticky left-0 bg-white z-10">
-                              <div className="space-y-1">
-                                <div className="text-xs text-gray-500 font-medium">{mergedRoom.room_class}</div>
-                                {mergedRoom.agoda && (
-                                  <div className="flex items-center gap-1">
-                                    <div className="w-3 h-3 bg-blue-500 rounded text-white text-xs flex items-center justify-center font-bold">A</div>
-                                    <span className="text-xs">{mergedRoom.agoda.room_name}</span>
-                                  </div>
-                                )}
-                                {mergedRoom.hyperguest && (
-                                  <div className="flex items-center gap-1">
-                                    <div className="w-3 h-3 bg-green-500 rounded text-white text-xs flex items-center justify-center font-bold">H</div>
-                                    <span className="text-xs">{mergedRoom.hyperguest.room_name}</span>
-                                  </div>
-                                )}
-                              </div>
-                            </td>
-                            {calendarData.agoda.date_columns.map((d: any) => {
-                              const date = formatDate(d);
-                              const agodaValue = mergedRoom.agoda ? 
-                                (inventoryEdits.agoda[mergedRoom.agoda.agoda_room_id]?.[date] ??
-                                 d.room_inventory.find((r: any) => r.agoda_room_id === mergedRoom.agoda.agoda_room_id)?.availability ?? "") : "";
-                              const hyperguestValue = mergedRoom.hyperguest ? 
-                                (inventoryEdits.hyperguest[mergedRoom.hyperguest.hyperguest_room_id]?.[date] ??
-                                 calendarData.hyperguest.date_columns.find((col: any) => formatDate(col) === date)?.room_inventory.find((r: any) => r.hyperguest_room_id === mergedRoom.hyperguest.hyperguest_room_id)?.availability ?? "") : "";
-                              
-                              const isAgodaSelected = mergedRoom.agoda ? isCellSelected(date, mergedRoom.agoda.agoda_room_id, 'agoda') : false;
-                              
-                              return (
-                                <td key={d.date} className="px-2 py-3 text-center">
-                                  <div className="space-y-1">
-                                    {/* Agoda Input */}
-                                    {mergedRoom.agoda && (
-                                      <div className="flex flex-col items-center gap-1">
-                                        <Input
-                                          type="number"
-                                          className="w-12 text-center text-sm h-8"
-                                          value={agodaValue}
-                                          onChange={e =>
-                                            handleInventoryChange(
-                                              "agoda",
-                                              mergedRoom.agoda.agoda_room_id,
-                                              date,
-                                              Number(e.target.value)
-                                            )
-                                          }
-                                        />
-                                        <button
-                                          onClick={() => toggleCellSelection(date, mergedRoom.agoda.agoda_room_id, 'agoda')}
-                                          className={`p-1 rounded transition-colors duration-200 ${
-                                            isAgodaSelected 
-                                              ? 'text-blue-600 bg-blue-100' 
-                                              : 'text-gray-400 hover:text-gray-600 hover:bg-gray-100'
-                                          }`}
-                                        >
-                                          {isAgodaSelected ? (
-                                            <CheckSquare className="h-3 w-3" />
-                                          ) : (
-                                            <Square className="h-3 w-3" />
-                                          )}
-                                        </button>
-                                      </div>
-                                    )}
-                                    
-                                    {/* HyperGuest Text */}
-                                    {mergedRoom.hyperguest && (
-                                      <div className="text-xs text-gray-500">
-                                        HG: {hyperguestValue}
-                                      </div>
-                                    )}
-                                  </div>
-                                </td>
-                              );
-                            })}
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* Desktop View - Table Layout */}
+            {/* DESKTOP VIEW */}
             <div className="hidden md:block overflow-x-auto">
               <table className="min-w-full divide-y divide-gray-200">
                 <thead className="bg-gray-50">
                   <tr>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider sticky left-0 bg-gray-50 z-10 min-w-[200px]">
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider sticky left-0 bg-gray-50 z-10 min-w-[250px]">
                       <div className="flex items-center gap-2">
                         <Calendar className="h-4 w-4" />
-                        Date / Room
-            </div>
+                        Room / Date
+                      </div>
                     </th>
-                    {calendarData.agoda.date_columns.map((d: any) => {
-                      const isFullySelected = isColumnFullySelected(d);
+                    {calendarData.agoda.date_columns.map((d) => {
+                      const isPriceColFullySelected = isColumnFullySelected(
+                        d,
+                        "price"
+                      );
+                      const isAvailColFullySelected = isColumnFullySelected(
+                        d,
+                        "inventory"
+                      );
+                      const dateKey = formatDate(d);
+
                       return (
-                        <th key={d.date} className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider min-w-[120px]">
-                          <div className="flex flex-col items-center">
-                            <span className="font-semibold">{d.day}</span>
-                            <span className="text-gray-400">{d.date}/{d.month}</span>
-                            <button
-                              onClick={() => isFullySelected ? unselectColumn(d) : selectColumn(d)}
-                              className={`mt-1 text-xs font-medium transition-colors duration-200 ${
-                                isFullySelected 
-                                  ? 'text-red-600 hover:text-red-800' 
-                                  : 'text-blue-600 hover:text-blue-800'
-                              }`}
-                            >
-                              {isFullySelected ? 'Unselect All' : 'Select All'}
-                            </button>
-            </div>
+                        <th
+                          key={dateKey}
+                          className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider min-w-[150px]"
+                        >
+                          <div className="flex flex-col items-center gap-1">
+                            <span className="font-semibold text-gray-900">
+                              {d.day}
+                            </span>
+                            <span className="text-gray-400">
+                              {d.date}/{d.month}
+                            </span>
+                            <div className="flex gap-1 mt-1">
+                              <button
+                                onClick={() =>
+                                  isPriceColFullySelected
+                                    ? unselectColumn(d, "price")
+                                    : selectColumn(d, "price")
+                                }
+                                className="text-xs font-medium transition-colors duration-200 px-2 py-1 rounded"
+                                style={{
+                                  backgroundColor: isPriceColFullySelected
+                                    ? "#fee2e2"
+                                    : "#dbeafe",
+                                  color: isPriceColFullySelected
+                                    ? "#991b1b"
+                                    : "#1e40af",
+                                }}
+                              >
+                                {isPriceColFullySelected
+                                  ? "✕ Price"
+                                  : "✓ Price"}
+                              </button>
+                              <button
+                                onClick={() =>
+                                  isAvailColFullySelected
+                                    ? unselectColumn(d, "inventory")
+                                    : selectColumn(d, "inventory")
+                                }
+                                className="text-xs font-medium transition-colors duration-200 px-2 py-1 rounded"
+                                style={{
+                                  backgroundColor: isAvailColFullySelected
+                                    ? "#fee2e2"
+                                    : "#d1fae5",
+                                  color: isAvailColFullySelected
+                                    ? "#991b1b"
+                                    : "#065f46",
+                                }}
+                              >
+                                {isAvailColFullySelected
+                                  ? "✕ Avail"
+                                  : "✓ Avail"}
+                              </button>
+                            </div>
+                          </div>
                         </th>
                       );
                     })}
                   </tr>
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-200">
-                  {/* Base Price Row */}
-                  <tr className="bg-blue-50">
-                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 sticky left-0 bg-blue-50 z-10">
-                      <div className="flex items-center gap-2">
-                        <Percent className="h-4 w-4" />
-                        Base Price
-                        <button
-                          onClick={() => isRowFullySelected('base') ? unselectRow('base') : selectRow('base')}
-                          className={`ml-2 text-xs font-medium transition-colors duration-200 ${
-                            isRowFullySelected('base') 
-                              ? 'text-red-600 hover:text-red-800' 
-                              : 'text-blue-600 hover:text-blue-800'
-                          }`}
-                        >
-                          {isRowFullySelected('base') ? 'Unselect All' : 'Select All'}
-                        </button>
-        </div>
-                    </td>
-                    {calendarData.agoda.date_columns.map((d: any) => {
-                      const date = formatDate(d);
-                      const isSelected = isCellSelected(date, 'base');
-                      const isInDragRange = isCellInDragRange(date, 'base');
-                      return (
-                        <td 
-                          key={d.date} 
-                          className={`px-4 py-4 text-center ${isInDragRange ? 'bg-blue-100' : ''}`}
-                          onMouseDown={() => handleMouseDown(date, 'base')}
-                          onMouseEnter={() => handleMouseEnter(date, 'base')}
-                        >
-                          <div className="flex items-center justify-center gap-2">
-                            <Input
-                              type="number"
-                              className="w-20 text-center"
-                              value={
-                                (basePriceEdits[date] ?? d.base_room_rate ?? "").toString()
-                              }
-                              onChange={e =>
-                                handleBasePriceChange(date, Number(e.target.value))
-                              }
-                            />
-                            <button
-                              onClick={() => toggleCellSelection(date, 'base')}
-                              className={`p-1 rounded transition-colors duration-200 ${
-                                isSelected 
-                                  ? 'text-blue-600 bg-blue-50' 
-                                  : 'text-gray-400 hover:text-gray-600 hover:bg-gray-50'
+                  {getAllRooms().map((room, roomIndex) => {
+                    const isPriceRowFullySelected = isRowFullySelected(
+                      room.room_id,
+                      "price"
+                    );
+                    const isAvailRowFullySelected = isRowFullySelected(
+                      room.room_id,
+                      "inventory"
+                    );
+
+                    return (
+                      <tr
+                        key={`${room.room_id}-${roomIndex}`}
+                        className="hover:bg-gray-50"
+                      >
+                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 sticky left-0 bg-white z-10">
+                          <div className="flex flex-col gap-2">
+                            <div className="flex items-center gap-2">
+                              <div
+                                className={`w-3 h-3 rounded ${
+                                  room.ota === "agoda"
+                                    ? "bg-blue-500"
+                                    : "bg-green-500"
+                                }`}
+                              ></div>
+                              <div className="flex-1">
+                                <div className="text-xs text-gray-500 mb-1">
+                                  {room.ota === "agoda"
+                                    ? `Agoda: ${room.room_id}`
+                                    : `HG: ${room.room_id}`}
+                                </div>
+                                <div className="text-sm font-medium">
+                                  {room.room_name}
+                                </div>
+                                <div className="flex items-center gap-1 text-xs mt-1">
+                                  <span className="px-2 py-1 bg-gray-100 text-gray-800 rounded-full text-xs">
+                                    Inv: {room.room_data.inventory}
+                                  </span>
+                                  <span className="px-2 py-1 bg-blue-100 text-blue-800 rounded-full text-xs">
+                                    Avail: {room.room_data.availability}
+                                  </span>
+                                  {room.room_data.price && (
+                                    <span className="px-2 py-1 bg-indigo-100 text-indigo-800 rounded-full text-xs">
+                                      ₹{room.room_data.price}
+                                    </span>
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+                            <div className="flex gap-1">
+                              <Button
+                                size="sm"
+                                variant="secondary"
+                                className="flex-1 h-7 px-2 text-xs"
+                                onClick={() =>
+                                  isPriceRowFullySelected
+                                    ? unselectRoomRow(room.room_id, "price")
+                                    : selectRoomRow(room.room_id, "price")
+                                }
+                              >
+                                {isPriceRowFullySelected
+                                  ? "✕ Price"
+                                  : "✓ Price"}
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="secondary"
+                                className="flex-1 h-7 px-2 text-xs"
+                                onClick={() =>
+                                  isAvailRowFullySelected
+                                    ? unselectRoomRow(room.room_id, "inventory")
+                                    : selectRoomRow(room.room_id, "inventory")
+                                }
+                              >
+                                {isAvailRowFullySelected
+                                  ? "✕ Avail"
+                                  : "✓ Avail"}
+                              </Button>
+                            </div>
+                          </div>
+                        </td>
+
+                        {calendarData.agoda.date_columns.map((d) => {
+                          const date = formatDate(d);
+                          const isPriceSelected = isCellSelected(
+                            date,
+                            room.room_id,
+                            "price"
+                          );
+                          const isAvailSelected = isCellSelected(
+                            date,
+                            room.room_id,
+                            "inventory"
+                          );
+                          const isInDragRangePrice = isCellInDragRange(
+                            date,
+                            room.room_id
+                          );
+
+                          // Get current values from API or edits - per date and per OTA
+                          let currentPrice = 0;
+                          let currentAvail = 0;
+
+                          if (room.ota === "hyperguest") {
+                            const hgDateCol =
+                              calendarData.hyperguest.date_columns.find(
+                                (col) => formatDate(col) === date
+                              );
+                            if (hgDateCol && hgDateCol.room_inventory) {
+                              const [room_type_code, rate_plan_code] =
+                                room.room_id.split("_");
+                              const hgRoom = hgDateCol.room_inventory.find(
+                                (r) =>
+                                  r.room_type_code === room_type_code &&
+                                  (r.rate_plan_code || "CP") ===
+                                    (rate_plan_code || "CP")
+                              );
+                              currentPrice = hgRoom?.price ?? 0;
+                              currentAvail = hgRoom?.availability ?? 0;
+                            }
+                          } else {
+                            const agodaDateCol =
+                              calendarData.agoda.date_columns.find(
+                                (col) => formatDate(col) === date
+                              );
+                            if (agodaDateCol && agodaDateCol.room_inventory) {
+                              const agodaRoom =
+                                agodaDateCol.room_inventory.find(
+                                  (r) => r.agoda_room_id === room.room_id
+                                );
+                              currentPrice = agodaRoom?.price ?? 0;
+                              currentAvail = agodaRoom?.availability ?? 0;
+                            }
+                          }
+
+                          const editedPrice =
+                            priceEdits[room.room_id]?.[date] ?? currentPrice;
+                          const editedAvail =
+                            inventoryEdits[room.room_id]?.[date] ??
+                            currentAvail;
+
+                          return (
+                            <td
+                              key={date}
+                              className={`px-4 py-4 text-center relative ${
+                                isInDragRangePrice ? "bg-blue-50" : ""
                               }`}
                             >
-                              {isSelected ? (
-                                <CheckSquare className="h-4 w-4" />
-                              ) : (
-                                <Square className="h-4 w-4" />
-                              )}
-                            </button>
-          </div>
-                        </td>
-                      );
-                    })}
-                  </tr>
-
-                  {/* Merged Availability Section */}
-                  <tr>
-                    <td colSpan={calendarData.agoda.date_columns.length + 1} className="px-6 py-3 bg-gray-100">
-                      <div className="flex items-center gap-2">
-                        <span className="text-sm font-semibold text-gray-900">Room Availability</span>
-                      </div>
-                    </td>
-                  </tr>
-                  {getMergedRooms().map((mergedRoom: any) => (
-                    <tr key={mergedRoom.room_class} className="hover:bg-gray-50">
-                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 sticky left-0 bg-white z-10">
-                        <div className="flex items-center gap-2">
-                          <div className="flex-1">
-                            <div className="text-xs text-gray-500 mb-1">{mergedRoom.room_class}</div>
-                            {mergedRoom.agoda && (
-                              <div className="flex items-center gap-1 mb-1">
-                                <div className="w-4 h-4 bg-blue-500 rounded text-white text-xs flex items-center justify-center font-bold">A</div>
-                                <span className="text-sm">{mergedRoom.agoda.room_name}</span>
-                              </div>
-                            )}
-                            {mergedRoom.hyperguest && (
-                              <div className="flex items-center gap-1">
-                                <div className="w-4 h-4 bg-green-500 rounded text-white text-xs flex items-center justify-center font-bold">H</div>
-                                <span className="text-sm">{mergedRoom.hyperguest.room_name}</span>
-                              </div>
-                            )}
-                          </div>
-                        </div>
-                      </td>
-                      {calendarData.agoda.date_columns.map((d: any) => {
-                        const date = formatDate(d);
-                        const agodaValue = mergedRoom.agoda ? 
-                          (inventoryEdits.agoda[mergedRoom.agoda.agoda_room_id]?.[date] ??
-                           d.room_inventory.find((r: any) => r.agoda_room_id === mergedRoom.agoda.agoda_room_id)?.availability ?? "") : "";
-                        const hyperguestValue = mergedRoom.hyperguest ? 
-                          (inventoryEdits.hyperguest[mergedRoom.hyperguest.hyperguest_room_id]?.[date] ??
-                           calendarData.hyperguest.date_columns.find((col: any) => formatDate(col) === date)?.room_inventory.find((r: any) => r.hyperguest_room_id === mergedRoom.hyperguest.hyperguest_room_id)?.availability ?? "") : "";
-                        
-                        const isAgodaSelected = mergedRoom.agoda ? isCellSelected(date, mergedRoom.agoda.agoda_room_id, 'agoda') : false;
-                        const isHyperguestSelected = mergedRoom.hyperguest ? isCellSelected(date, mergedRoom.hyperguest.hyperguest_room_id, 'hyperguest') : false;
-                        const isInDragRange = mergedRoom.agoda ? isCellInDragRange(date, mergedRoom.agoda.agoda_room_id, 'agoda') : false;
-                        
-                        return (
-                          <td 
-                            key={d.date} 
-                            className={`px-4 py-4 text-start ${isInDragRange ? 'bg-green-100' : ''}`}
-                            onMouseDown={() => mergedRoom.agoda && handleMouseDown(date, mergedRoom.agoda.agoda_room_id, 'agoda')}
-                            onMouseEnter={() => mergedRoom.agoda && handleMouseEnter(date, mergedRoom.agoda.agoda_room_id, 'agoda')}
-                          >
-                            <div className="space-y-1">
-                              {/* Agoda Input */}
-                              {mergedRoom.agoda && (
+                              <div className="flex flex-col gap-2">
+                                {/* Price Input */}
                                 <div className="flex items-center justify-center gap-1">
                                   <Input
                                     type="number"
-                                    className="w-16 text-center text-sm"
-                                    value={agodaValue}
-                                    onChange={e =>
+                                    className="w-20 text-center text-sm h-8"
+                                    value={editedPrice}
+                                    onChange={(e) =>
+                                      handlePriceChange(
+                                        room.room_id,
+                                        date,
+                                        Number(e.target.value)
+                                      )
+                                    }
+                                    onMouseDown={() =>
+                                      handleMouseDown(
+                                        date,
+                                        room.room_id,
+                                        room.ota
+                                      )
+                                    }
+                                    onMouseEnter={() =>
+                                      handleMouseEnter(
+                                        date,
+                                        room.room_id,
+                                        room.ota
+                                      )
+                                    }
+                                  />
+                                  <button
+                                    onClick={() =>
+                                      toggleCellSelection(
+                                        date,
+                                        room.room_id,
+                                        "price"
+                                      )
+                                    }
+                                    className={`p-1 rounded transition-colors duration-200 ${
+                                      isPriceSelected
+                                        ? "text-blue-600 bg-blue-100"
+                                        : "text-gray-400 hover:text-gray-600 hover:bg-gray-100"
+                                    }`}
+                                  >
+                                    {isPriceSelected ? (
+                                      <CheckSquare className="h-4 w-4" />
+                                    ) : (
+                                      <Square className="h-4 w-4" />
+                                    )}
+                                  </button>
+                                </div>
+
+                                {/* Availability Input */}
+                                <div className="flex items-center justify-center gap-1">
+                                  <Input
+                                    type="number"
+                                    className="w-20 text-center text-sm h-8"
+                                    value={editedAvail}
+                                    onChange={(e) =>
                                       handleInventoryChange(
-                                        "agoda",
-                                        mergedRoom.agoda.agoda_room_id,
+                                        room.room_id,
                                         date,
                                         Number(e.target.value)
                                       )
                                     }
                                   />
                                   <button
-                                    onClick={() => toggleCellSelection(date, mergedRoom.agoda.agoda_room_id, 'agoda')}
+                                    onClick={() =>
+                                      toggleCellSelection(
+                                        date,
+                                        room.room_id,
+                                        "inventory"
+                                      )
+                                    }
                                     className={`p-1 rounded transition-colors duration-200 ${
-                                      isAgodaSelected 
-                                        ? 'text-blue-600 bg-blue-50' 
-                                        : 'text-gray-400 hover:text-gray-600 hover:bg-gray-50'
+                                      isAvailSelected
+                                        ? "text-green-600 bg-green-100"
+                                        : "text-gray-400 hover:text-gray-600 hover:bg-gray-100"
                                     }`}
                                   >
-                                    {isAgodaSelected ? (
-                                      <CheckSquare className="h-3 w-3" />
+                                    {isAvailSelected ? (
+                                      <CheckSquare className="h-4 w-4" />
                                     ) : (
-                                      <Square className="h-3 w-3" />
+                                      <Square className="h-4 w-4" />
                                     )}
                                   </button>
                                 </div>
-                              )}
-                              
-                              {/* HyperGuest Text (only show if different from Agoda) */}
-                              {/* {mergedRoom.hyperguest && agodaValue !== hyperguestValue && ( */}
-                                <div className="text-xs text-gray-500">
-                                  HG: {hyperguestValue}
-                                </div>
-                              {/* )} */}
-                            </div>
-                          </td>
-                        );
-                      })}
-                    </tr>
-                  ))}
+                              </div>
+                            </td>
+                          );
+                        })}
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
+            </div>
+
+            {/* MOBILE VIEW */}
+            <div className="block md:hidden p-4">
+              <div className="text-center text-gray-500">
+                <p className="mb-2">📱 Mobile view under construction</p>
+                <p className="text-sm">
+                  Please use desktop for full calendar functionality
+                </p>
+              </div>
             </div>
           </div>
         ) : (
           <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-12 text-center">
             <CalendarIcon className="mx-auto h-12 w-12 text-gray-400" />
-            <h3 className="mt-2 text-sm font-medium text-gray-900">No calendar data</h3>
+            <h3 className="mt-2 text-sm font-medium text-gray-900">
+              No calendar data
+            </h3>
             <p className="mt-1 text-sm text-gray-500">
               Enter a property ID and click search to load calendar data.
             </p>
           </div>
         )}
-    </div>
+      </div>
     </PageTransitionWrapper>
   );
 }
