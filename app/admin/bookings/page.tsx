@@ -7,7 +7,7 @@ import toast from 'react-hot-toast';
 
 import {
   Calendar,
-  DollarSign,
+  IndianRupee,
   Package,
   TrendingUp,
   Search,
@@ -693,11 +693,11 @@ export default function BookingsPage() {
                 <div>
                   <p className="text-sm font-medium text-gray-600">Total Revenue</p>
                   <p className="text-2xl font-semibold text-gray-900 mt-1">
-                    ${bookingStats.summary.total_revenue.toFixed(2)}
+                    ₹{bookingStats.summary.total_revenue.toFixed(2)}
                   </p>
                 </div>
                 <div className="w-12 h-12 rounded-full bg-gray-100 flex items-center justify-center">
-                  <DollarSign className="h-6 w-6 text-gray-600" />
+                  <IndianRupee className="h-6 w-6 text-gray-600" />
                 </div>
               </div>
             </div>
@@ -1080,7 +1080,7 @@ export default function BookingsPage() {
               {selectedBooking.platform === 'agoda' && (selectedBooking as AgodaBookingDetails).pricing?.daily_prices && (selectedBooking as AgodaBookingDetails).pricing.daily_prices.length > 0 && (
                 <div className="bg-white border border-gray-200 rounded-lg p-4">
                   <h5 className="font-medium text-gray-900 mb-3 flex items-center">
-                    <DollarSign className="h-4 w-4 mr-2" />
+                    <IndianRupee className="h-4 w-4 mr-2" />
                     Daily Pricing
                   </h5>
                   <div className="space-y-2 max-h-48 overflow-y-auto">

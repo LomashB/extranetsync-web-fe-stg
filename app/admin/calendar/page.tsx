@@ -191,6 +191,9 @@ export default function CalendarManagement() {
   const [inventoryEdits, setInventoryEdits] = useState<
     Record<string, Record<string, number>>
   >({});
+  const [closeOutEdits, setCloseOutEdits] = useState<
+    Record<string, Record<string, "Y" | "N">>
+  >({});
 
   // Selection states
   const [selectedCells, setSelectedCells] = useState<Set<string>>(new Set());
@@ -291,6 +294,7 @@ export default function CalendarManagement() {
         setCalendarData(data);
         setPriceEdits({});
         setInventoryEdits({});
+        setCloseOutEdits({});
         setSelectedCells(new Set());
         setSelectionMode("none");
         toast.success("Calendar data loaded successfully!");
@@ -646,6 +650,31 @@ export default function CalendarManagement() {
     }
   };
 
+  const batchUpdateCloseOut = (closeOut: "Y" | "N") => {
+    if (selectionMode === "availability") {
+      const newCloseOutEdits = { ...closeOutEdits };
+
+      // Update close_out for all selected availability cells (Agoda + HyperGuest)
+      selectedCells.forEach((cellKey) => {
+        if (!cellKey.startsWith("inventory_")) return;
+
+        // cellKey format: "inventory_${roomId}_${date}"
+        const parts = cellKey.split("_");
+        if (parts.length < 3) return;
+
+        // Date is always the last segment (YYYY-MM-DD)
+        const date = parts[parts.length - 1];
+        // RoomId is everything between "inventory" and the date (can contain underscores for HyperGuest)
+        const roomId = parts.slice(1, -1).join("_");
+
+        if (!newCloseOutEdits[roomId]) newCloseOutEdits[roomId] = {};
+        newCloseOutEdits[roomId][date] = closeOut;
+      });
+
+      setCloseOutEdits(newCloseOutEdits);
+    }
+  };
+
   // ─────────────────────────────────────────────────────────────
   // DRAG SELECTION HANDLERS
   // ─────────────────────────────────────────────────────────────
@@ -701,20 +730,30 @@ export default function CalendarManagement() {
         const maxRoomIndex = Math.max(startRoomIndex, endRoomIndex);
         const roomRange = allRooms.slice(minRoomIndex, maxRoomIndex + 1);
 
-        const newSelection = new Set(selectedCells);
+        // Start with only the current selection mode type to keep modes exclusive
+        const newSelection = new Set<string>();
+        selectedCells.forEach((key) => {
+          if (selectionMode === "price" && key.startsWith("price_")) {
+            newSelection.add(key);
+          }
+          if (selectionMode === "availability" && key.startsWith("inventory_")) {
+            newSelection.add(key);
+          }
+        });
+
+        // Add all cells in the drag range
+        const type: "price" | "inventory" = selectionMode === "price" ? "price" : "inventory";
+        const modeToSet: "price" | "availability" = type === "price" ? "price" : "availability";
         roomRange.forEach((room) => {
           dateRange.forEach((date) => {
-            newSelection.add(
-              createCellKey(
-                date,
-                room.room_id,
-                selectionMode === "price" ? "price" : "inventory"
-              )
-            );
+            newSelection.add(createCellKey(date, room.room_id, type));
           });
         });
 
         setSelectedCells(newSelection);
+        if (selectionMode === "none") {
+          setSelectionMode(modeToSet);
+        }
       }
     }
 
@@ -878,46 +917,86 @@ export default function CalendarManagement() {
 
       // Prepare availability updates (Agoda + HyperGuest)
       const availabilityUpdates: Array<any> = [];
+      const updatesMap = new Map<string, any>();
 
+      // Process inventory edits
       Object.entries(inventoryEdits).forEach(([roomId, dates]) => {
         Object.entries(dates).forEach(([date, available_rooms]) => {
-          if (roomId.includes("_")) {
-            // HyperGuest room: room_id is `${room_type_code}_${rate_plan_code}`
-            const [room_type_code, rate_plan_code] = roomId.split("_");
-
-            // Only send HyperGuest availability when that room actually exists for this date
-            const hgDateCol = calendarData.hyperguest?.date_columns.find(
-              (col) => formatDate(col) === date
-            );
-            const hasRoomOnDate = hgDateCol?.room_inventory?.some(
-              (r) =>
-                r.room_type_code === room_type_code &&
-                (r.rate_plan_code || "CP") === (rate_plan_code || "CP")
-            );
-
-            if (hasRoomOnDate) {
-              availabilityUpdates.push({
-                room_type_code,
-                rate_plan_code: rate_plan_code || "CP",
-                date,
-                available_rooms,
-                closed: false,
-                ctd: false,
-                cta: false,
-              });
-            }
+          const key = `${roomId}_${date}`;
+          if (!updatesMap.has(key)) {
+            updatesMap.set(key, { roomId, date, available_rooms });
           } else {
-            // Agoda room
-            availabilityUpdates.push({
-              agoda_room_id: roomId,
+            updatesMap.get(key).available_rooms = available_rooms;
+          }
+        });
+      });
+
+      // Process close_out edits
+      Object.entries(closeOutEdits).forEach(([roomId, dates]) => {
+        Object.entries(dates).forEach(([date, close_out]) => {
+          const key = `${roomId}_${date}`;
+          if (!updatesMap.has(key)) {
+            updatesMap.set(key, { roomId, date, close_out });
+          } else {
+            updatesMap.get(key).close_out = close_out;
+          }
+        });
+      });
+
+      // Build availability updates array
+      updatesMap.forEach((update) => {
+        const { roomId, date, available_rooms, close_out } = update;
+
+        if (roomId.includes("_") && roomId.split("_").length >= 2) {
+          // HyperGuest room: room_id is `${room_type_code}_${rate_plan_code}`
+          const roomParts = roomId.split("_");
+          const rate_plan_code = roomParts.pop() || "CP";
+          const room_type_code = roomParts.join("_");
+
+          // Only send HyperGuest availability when that room actually exists for this date
+          const hgDateCol = calendarData.hyperguest?.date_columns.find(
+            (col) => formatDate(col) === date
+          );
+          const hasRoomOnDate = hgDateCol?.room_inventory?.some(
+            (r) =>
+              r.room_type_code === room_type_code &&
+              (r.rate_plan_code || "CP") === (rate_plan_code || "CP")
+          );
+
+          if (hasRoomOnDate) {
+            const updatePayload: any = {
+              room_type_code,
+              rate_plan_code: rate_plan_code || "CP",
               date,
-              available_rooms,
               closed: false,
               ctd: false,
               cta: false,
-            });
+            };
+            if (available_rooms !== undefined) {
+              updatePayload.available_rooms = available_rooms;
+            }
+            if (close_out !== undefined) {
+              updatePayload.close_out = close_out;
+            }
+            availabilityUpdates.push(updatePayload);
           }
-        });
+        } else {
+          // Agoda room
+          const updatePayload: any = {
+            agoda_room_id: roomId,
+            date,
+            closed: false,
+            ctd: false,
+            cta: false,
+          };
+          if (available_rooms !== undefined) {
+            updatePayload.available_rooms = available_rooms;
+          }
+          if (close_out !== undefined) {
+            updatePayload.close_out = close_out;
+          }
+          availabilityUpdates.push(updatePayload);
+        }
       });
 
       // Send availability updates if any
@@ -946,6 +1025,7 @@ export default function CalendarManagement() {
       // Clear edits and selections only if all requests succeeded
       setPriceEdits({});
       setInventoryEdits({});
+      setCloseOutEdits({});
       setSelectedCells(new Set());
       setSelectionMode("none");
 
@@ -969,7 +1049,8 @@ export default function CalendarManagement() {
 
   const hasChanges =
     Object.keys(priceEdits).length > 0 ||
-    Object.keys(inventoryEdits).length > 0;
+    Object.keys(inventoryEdits).length > 0 ||
+    Object.keys(closeOutEdits).length > 0;
   const selectedCount = selectedCells.size;
 
   // ─────────────────────────────────────────────────────────────
@@ -1127,13 +1208,10 @@ export default function CalendarManagement() {
         {/* ──────────────────────────────────────────────────────── */}
         {/* FILTER CONTROLS */}
         {/* ──────────────────────────────────────────────────────── */}
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 md:p-6">
+        <div className="">
           <div className="flex flex-col md:flex-row gap-4 md:items-end md:gap-2">
             <div className="flex-1 md:max-w-sm">
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                <Building2 className="h-4 w-4 inline mr-1" />
-                Agoda Property ID
-              </label>
+            
               <Select
                 id="calendar-property-select"
                 instanceId="calendar-property-select"
@@ -1157,10 +1235,7 @@ export default function CalendarManagement() {
 
             <div className="flex flex-col md:flex-row gap-4">
               <div className="flex-1">
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  <Calendar className="h-4 w-4 inline mr-1" />
-                  Date Range
-                </label>
+              
                 <Button
                   type="button"
                   variant="secondary"
@@ -1259,7 +1334,7 @@ export default function CalendarManagement() {
         {/* BULK OPERATIONS */}
         {/* ──────────────────────────────────────────────────────── */}
         {calendarData && (
-          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
+          <div className="">
             <div className="flex flex-col gap-4">
               <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
                 <div className="flex flex-col md:flex-row md:items-center gap-2">
@@ -1416,6 +1491,24 @@ export default function CalendarManagement() {
                           batchUpdateSelected(Number(e.target.value))
                         }
                       />
+                      {selectionMode === "availability" && (
+                        <>
+                          <Button
+                            variant="secondary"
+                            size="sm"
+                            onClick={() => batchUpdateCloseOut("Y")}
+                          >
+                            Close Out (Y)
+                          </Button>
+                          <Button
+                            variant="secondary"
+                            size="sm"
+                            onClick={() => batchUpdateCloseOut("N")}
+                          >
+                            Open (N)
+                          </Button>
+                        </>
+                      )}
                     </div>
                   </div>
                 )}
@@ -1479,7 +1572,7 @@ export default function CalendarManagement() {
                                     ? unselectColumn(d, "price")
                                     : selectColumn(d, "price")
                                 }
-                                className="text-xs font-medium transition-colors duration-200 px-2 py-1 rounded"
+                                className="text-xs font-medium transition-colors duration-200 px-1.5 py-0.5 rounded"
                                 style={{
                                   backgroundColor: isPriceColFullySelected
                                     ? "#fee2e2"
@@ -1499,7 +1592,7 @@ export default function CalendarManagement() {
                                     ? unselectColumn(d, "inventory")
                                     : selectColumn(d, "inventory")
                                 }
-                                className="text-xs font-medium transition-colors duration-200 px-2 py-1 rounded"
+                                className="text-xs font-medium transition-colors duration-200 px-1.5 py-0.5 rounded"
                                 style={{
                                   backgroundColor: isAvailColFullySelected
                                     ? "#fee2e2"
@@ -1536,69 +1629,87 @@ export default function CalendarManagement() {
                         key={`${room.room_id}-${roomIndex}`}
                         className="hover:bg-gray-50"
                       >
-                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 sticky left-0 bg-white z-10">
-                          <div className="flex flex-col gap-2">
+                        <td className="px-4 py-2 whitespace-nowrap text-sm font-medium text-gray-900 sticky left-0 bg-white z-10">
+                          <div className="flex gap-4 items-center justify-between">
                             <div className="flex items-center gap-2">
-                              <div
+                              {/* <div
                                 className={`w-3 h-3 rounded ${
                                   room.ota === "agoda"
                                     ? "bg-blue-500"
                                     : "bg-green-500"
                                 }`}
-                              ></div>
+                              ></div> */}
                               <div className="flex-1">
                                 <div className="text-xs text-gray-500 mb-1">
                                   {room.ota === "agoda"
                                     ? `Agoda: ${room.room_id}`
                                     : `HG: ${room.room_id}`}
                                 </div>
-                                <div className="text-sm font-medium">
+                                <div className="text-xs font-medium max-w-[200px] whitespace-pre-line overflow-hidden text-ellipsis line-clamp-2 break-words">
                                   {room.room_name}
                                 </div>
-                                <div className="flex items-center gap-1 text-xs mt-1">
-                                  <span className="px-2 py-1 bg-gray-100 text-gray-800 rounded-full text-xs">
+                                <div className="flex items-center gap-1 text-[10px] mt-1">
+                                  <span className="px-1.5 bg-gray-100 text-gray-800 rounded-md">
                                     Inv: {room.room_data.inventory}
                                   </span>
-                                  <span className="px-2 py-1 bg-blue-100 text-blue-800 rounded-full text-xs">
+                                  <span className="px-1.5 bg-blue-100 text-blue-800 rounded-md">
                                     Avail: {room.room_data.availability}
                                   </span>
                                   {room.room_data.price && (
-                                    <span className="px-2 py-1 bg-indigo-100 text-indigo-800 rounded-full text-xs">
+                                      <span className="px-1.5 bg-indigo-100 text-indigo-800 rounded-md">
                                       ₹{room.room_data.price}
                                     </span>
                                   )}
                                 </div>
                               </div>
                             </div>
-                            <div className="flex gap-1">
-                              <Button
-                                size="sm"
-                                variant="secondary"
-                                className="flex-1 h-7 px-2 text-xs"
-                                onClick={() =>
-                                  isPriceRowFullySelected
-                                    ? unselectRoomRow(room.room_id, "price")
-                                    : selectRoomRow(room.room_id, "price")
-                                }
-                              >
-                                {isPriceRowFullySelected
-                                  ? "✕ Price"
-                                  : "✓ Price"}
-                              </Button>
-                              <Button
-                                size="sm"
-                                variant="secondary"
-                                className="flex-1 h-7 px-2 text-xs"
-                                onClick={() =>
-                                  isAvailRowFullySelected
-                                    ? unselectRoomRow(room.room_id, "inventory")
-                                    : selectRoomRow(room.room_id, "inventory")
-                                }
-                              >
-                                {isAvailRowFullySelected
-                                  ? "✕ Avail"
-                                  : "✓ Avail"}
-                              </Button>
+                            <div className="flex flex-col gap-1 mt-2">
+                              <div className="flex items-center justify-between gap-1">
+                               
+                                <button
+                                  onClick={() =>
+                                    isPriceRowFullySelected
+                                      ? unselectRoomRow(room.room_id, "price")
+                                      : selectRoomRow(room.room_id, "price")
+                                  }
+                                  className="text-xs font-bold transition-colors duration-200 px-1.5 py-0.5 rounded"
+                                  style={{
+                                    backgroundColor: isPriceRowFullySelected
+                                      ? "#fee2e2"
+                                      : "#dbeafe",
+                                    color: isPriceRowFullySelected
+                                      ? "#991b1b"
+                                      : "#1e40af",
+                                  }}
+                                >
+                                  {isPriceRowFullySelected
+                                    ? "✕ Price"
+                                    : "✓ Price"}
+                                </button>
+                              </div>
+                              <div className="flex items-center justify-between gap-1">
+                              
+                                <button
+                                  onClick={() =>
+                                    isAvailRowFullySelected
+                                      ? unselectRoomRow(room.room_id, "inventory")
+                                      : selectRoomRow(room.room_id, "inventory")
+                                  }
+                                  className="text-xs font-bold transition-colors duration-200 px-1.5 py-0.5 rounded"
+                                  style={{
+                                    backgroundColor: isAvailRowFullySelected
+                                      ? "#fee2e2"
+                                      : "#d1fae5",
+                                    color: isAvailRowFullySelected
+                                      ? "#991b1b"
+                                      : "#065f46",
+                                  }}
+                                >
+                                  {isAvailRowFullySelected
+                                    ? "✕ Avail"
+                                    : "✓ Avail"}
+                                </button>
+                              </div>
                             </div>
                           </div>
                         </td>
@@ -1623,6 +1734,7 @@ export default function CalendarManagement() {
                           // Get current values from API or edits - per date and per OTA
                           let currentPrice = 0;
                           let currentAvail = 0;
+                          let currentCloseOut: "Y" | "N" = "N";
 
                           if (room.ota === "hyperguest") {
                             const hgDateCol =
@@ -1640,6 +1752,7 @@ export default function CalendarManagement() {
                               );
                               currentPrice = hgRoom?.price ?? 0;
                               currentAvail = hgRoom?.availability ?? 0;
+                              currentCloseOut = (hgRoom?.close_out as "Y" | "N") ?? "N";
                             }
                           } else {
                             const agodaDateCol =
@@ -1653,6 +1766,7 @@ export default function CalendarManagement() {
                                 );
                               currentPrice = agodaRoom?.price ?? 0;
                               currentAvail = agodaRoom?.availability ?? 0;
+                              currentCloseOut = (agodaRoom?.close_out as "Y" | "N") ?? "N";
                             }
                           }
 
@@ -1661,15 +1775,49 @@ export default function CalendarManagement() {
                           const editedAvail =
                             inventoryEdits[room.room_id]?.[date] ??
                             currentAvail;
+                          const editedCloseOut =
+                            closeOutEdits[room.room_id]?.[date] ?? currentCloseOut;
+
+                          const isInDragRangeAvail = isCellInDragRange(
+                            date,
+                            room.room_id
+                          );
 
                           return (
                             <td
                               key={date}
                               className={`px-4 py-4 text-center relative ${
-                                isInDragRangePrice ? "bg-blue-50" : ""
+                                isInDragRangePrice && selectionMode === "price"
+                                  ? "bg-blue-50"
+                                  : isInDragRangeAvail &&
+                                    selectionMode === "availability"
+                                  ? "bg-green-50"
+                                  : ""
                               }`}
+                              onMouseDown={(e) => {
+                                // Only start drag if clicking on cell background, not on inputs or buttons
+                                if (
+                                  e.target === e.currentTarget ||
+                                  (e.target as HTMLElement).closest(".cell-drag-area")
+                                ) {
+                                  // Determine which type based on where in the cell the click happened
+                                  const rect = e.currentTarget.getBoundingClientRect();
+                                  const clickY = e.clientY - rect.top;
+                                  const cellHeight = rect.height;
+                                  
+                                  // If click is in upper half, select price; lower half, select availability
+                                  const type = clickY < cellHeight / 2 ? "price" : "inventory";
+                                  setSelectionMode(clickY < cellHeight / 2 ? "price" : "availability");
+                                  handleMouseDown(date, room.room_id, room.ota);
+                                }
+                              }}
+                              onMouseEnter={(e) => {
+                                if (isDragging && dragStart) {
+                                  handleMouseEnter(date, room.room_id, room.ota);
+                                }
+                              }}
                             >
-                              <div className="flex flex-col gap-2">
+                              <div className="flex flex-col gap-2 cell-drag-area">
                                 {/* Price Input */}
                                 <div className="flex items-center justify-center gap-1">
                                   <Input
@@ -1683,39 +1831,52 @@ export default function CalendarManagement() {
                                         Number(e.target.value)
                                       )
                                     }
-                                    onMouseDown={() =>
-                                      handleMouseDown(
-                                        date,
-                                        room.room_id,
-                                        room.ota
-                                      )
-                                    }
-                                    onMouseEnter={() =>
-                                      handleMouseEnter(
-                                        date,
-                                        room.room_id,
-                                        room.ota
-                                      )
-                                    }
+                                    onFocus={(e) => {
+                                      if (editedPrice === 0) {
+                                        e.target.select();
+                                      }
+                                    }}
+                                    onMouseDown={(e) => {
+                                      e.stopPropagation();
+                                      // Start drag selection for price when clicking on input
+                                      setSelectionMode("price");
+                                      handleMouseDown(date, room.room_id, room.ota);
+                                    }}
+                                    onMouseEnter={(e) => {
+                                      if (isDragging && dragStart && selectionMode === "price") {
+                                        handleMouseEnter(date, room.room_id, room.ota);
+                                      }
+                                    }}
+                                    onWheel={(e) => {
+                                      e.preventDefault();
+                                      e.stopPropagation();
+                                    }}
+                                    onTouchMove={(e) => {
+                                      e.stopPropagation();
+                                    }}
                                   />
                                   <button
-                                    onClick={() =>
+                                    onClick={(e) => {
+                                      e.stopPropagation();
                                       toggleCellSelection(
                                         date,
                                         room.room_id,
                                         "price"
-                                      )
-                                    }
-                                    className={`p-1 rounded transition-colors duration-200 ${
+                                      );
+                                    }}
+                                    onMouseDown={(e) => {
+                                      e.stopPropagation();
+                                    }}
+                                    className={`p-0.5 rounded transition-colors duration-200 ${
                                       isPriceSelected
                                         ? "text-blue-600 bg-blue-100"
                                         : "text-gray-400 hover:text-gray-600 hover:bg-gray-100"
                                     }`}
                                   >
                                     {isPriceSelected ? (
-                                      <CheckSquare className="h-4 w-4" />
+                                      <CheckSquare className="h-3 w-3" />
                                     ) : (
-                                      <Square className="h-4 w-4" />
+                                      <Square className="h-3 w-3" />
                                     )}
                                   </button>
                                 </div>
@@ -1733,27 +1894,66 @@ export default function CalendarManagement() {
                                         Number(e.target.value)
                                       )
                                     }
+                                    onFocus={(e) => {
+                                      if (editedAvail === 0) {
+                                        e.target.select();
+                                      }
+                                    }}
+                                    onMouseDown={(e) => {
+                                      e.stopPropagation();
+                                      // Start drag selection for availability when clicking on input
+                                      setSelectionMode("availability");
+                                      handleMouseDown(date, room.room_id, room.ota);
+                                    }}
+                                    onMouseEnter={(e) => {
+                                      if (
+                                        isDragging &&
+                                        dragStart &&
+                                        selectionMode === "availability"
+                                      ) {
+                                        handleMouseEnter(date, room.room_id, room.ota);
+                                      }
+                                    }}
+                                    onWheel={(e) => {
+                                      e.preventDefault();
+                                      e.stopPropagation();
+                                    }}
+                                    onTouchMove={(e) => {
+                                      e.stopPropagation();
+                                    }}
                                   />
                                   <button
-                                    onClick={() =>
+                                    onClick={(e) => {
+                                      e.stopPropagation();
                                       toggleCellSelection(
                                         date,
                                         room.room_id,
                                         "inventory"
-                                      )
-                                    }
-                                    className={`p-1 rounded transition-colors duration-200 ${
+                                      );
+                                    }}
+                                    onMouseDown={(e) => {
+                                      e.stopPropagation();
+                                    }}
+                                    className={`p-0.5 rounded transition-colors duration-200 ${
                                       isAvailSelected
                                         ? "text-green-600 bg-green-100"
                                         : "text-gray-400 hover:text-gray-600 hover:bg-gray-100"
                                     }`}
                                   >
                                     {isAvailSelected ? (
-                                      <CheckSquare className="h-4 w-4" />
+                                      <CheckSquare className="h-3 w-3" />
                                     ) : (
-                                      <Square className="h-4 w-4" />
+                                      <Square className="h-3 w-3" />
                                     )}
                                   </button>
+                                  {editedCloseOut === "Y" && (
+                                    <span
+                                      className="text-[10px] px-1 py-0.5 rounded bg-red-100 text-red-800 font-medium"
+                                      title="Close Out"
+                                    >
+                                      CO
+                                    </span>
+                                  )}
                                 </div>
                               </div>
                             </td>
