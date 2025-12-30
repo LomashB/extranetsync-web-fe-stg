@@ -1467,9 +1467,10 @@ export default function CalendarManagement() {
                 {selectedCount > 0 && (
                   <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 pt-3 border-t border-gray-200 md:border-t-0 md:pt-0">
                     <div className="text-sm text-gray-600 text-center sm:text-left">
+                      <div className="flex flex-col items-center gap-1">
                       {selectedCount} cells selected
                       {selectionMode !== "none" && (
-                        <span className="ml-2 px-2 py-1 rounded text-xs font-medium">
+                        <span className="p-1 rounded text-xs font-medium">
                           {selectionMode === "price" ? (
                             <span className="bg-blue-100 text-blue-800">
                               Price Mode
@@ -1481,6 +1482,7 @@ export default function CalendarManagement() {
                           )}
                         </span>
                       )}
+                      </div>
                     </div>
                     <div className="flex flex-col md:flex-row items-center gap-2">
                       <Input
@@ -1492,11 +1494,12 @@ export default function CalendarManagement() {
                         }
                       />
                       {selectionMode === "availability" && (
-                        <>
+                        <div className="flex flex-row items-center gap-2 ml-2">
                           <Button
                             variant="secondary"
                             size="sm"
                             onClick={() => batchUpdateCloseOut("Y")}
+                            className="text-xs whitespace-nowrap"
                           >
                             Close Out (Y)
                           </Button>
@@ -1504,10 +1507,11 @@ export default function CalendarManagement() {
                             variant="secondary"
                             size="sm"
                             onClick={() => batchUpdateCloseOut("N")}
+                            className="text-xs whitespace-nowrap"
                           >
                             Open (N)
                           </Button>
-                        </>
+                        </div>
                       )}
                     </div>
                   </div>
