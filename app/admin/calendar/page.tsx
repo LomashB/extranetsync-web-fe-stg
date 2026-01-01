@@ -70,6 +70,7 @@ interface RoomInventory {
   agoda_room_id?: string;
   room_type_code?: string;
   rate_plan_code?: string;
+  hyperguest_room_id?: string;
   room_name: string;
   inventory: number;
   availability: number;
@@ -131,6 +132,7 @@ interface MergedRoom {
   room_name: string;
   ota: "agoda" | "hyperguest";
   room_data: RoomInventory;
+  hyperguest_rooms?: MergedRoom[]; // HyperGuest rooms connected to this Agoda room
 }
 
 // ══════════════════════════════════════════════════════════════
@@ -513,6 +515,7 @@ export default function CalendarManagement() {
 
     const agodaRoomMap = new Map<string, RoomInventory>();
     const hgRoomMap = new Map<string, RoomInventory>();
+    const hgByAgodaId = new Map<string, MergedRoom[]>();
 
     // Collect unique Agoda rooms across all dates
     (calendarData.agoda?.date_columns || []).forEach((col) => {
@@ -523,37 +526,60 @@ export default function CalendarManagement() {
       });
     });
 
-    // Collect unique HyperGuest rooms across all dates
-    (calendarData.hyperguest?.date_columns || []).forEach((col) => {
+    // Collect unique HyperGuest rooms across all dates and group by agoda_room_id
+    if (calendarData.hyperguest && calendarData.hyperguest.date_columns) {
+      (calendarData.hyperguest.date_columns || []).forEach((col) => {
       (col.room_inventory || []).forEach((room) => {
-        if (room.room_type_code && room.rate_plan_code) {
-          const id = `${room.room_type_code}_${room.rate_plan_code}`;
-          if (!hgRoomMap.has(id)) {
-            hgRoomMap.set(id, room);
+        // Get room_type_code and rate_plan_code either directly or from hyperguest_room_id
+        let room_type_code = room.room_type_code;
+        let rate_plan_code = room.rate_plan_code;
+        let id: string | null = null;
+
+        if (room_type_code && rate_plan_code) {
+          id = `${room_type_code}_${rate_plan_code}`;
+        } else if (room.hyperguest_room_id) {
+          // Parse from hyperguest_room_id format: "Room-02_CP"
+          const parts = room.hyperguest_room_id.split("_");
+          if (parts.length >= 2) {
+            rate_plan_code = parts.pop() || "";
+            room_type_code = parts.join("_");
+            id = room.hyperguest_room_id;
+          }
+        }
+
+        if (id && !hgRoomMap.has(id)) {
+          hgRoomMap.set(id, room);
+          
+          // Group HyperGuest rooms by their connected Agoda room ID
+          if (room.agoda_room_id) {
+            if (!hgByAgodaId.has(room.agoda_room_id)) {
+              hgByAgodaId.set(room.agoda_room_id, []);
+            }
+            hgByAgodaId.get(room.agoda_room_id)!.push({
+              room_id: id,
+              room_name: room.room_name,
+              ota: "hyperguest" as const,
+              room_data: room,
+            });
           }
         }
       });
-    });
+      });
+    }
 
+    // Create Agoda rooms with their connected HyperGuest rooms
     const agodaRooms: MergedRoom[] = Array.from(agodaRoomMap.entries()).map(
       ([room_id, room]) => ({
         room_id,
         room_name: room.room_name,
         ota: "agoda" as const,
         room_data: room,
+        hyperguest_rooms: hgByAgodaId.get(room_id) || [],
       })
     );
 
-    const hgRooms: MergedRoom[] = Array.from(hgRoomMap.entries()).map(
-      ([id, room]) => ({
-        room_id: id,
-        room_name: room.room_name,
-        ota: "hyperguest" as const,
-        room_data: room,
-      })
-    );
-
-    return [...agodaRooms, ...hgRooms];
+    // Also include Agoda rooms that don't have any HyperGuest mappings
+    return agodaRooms;
   };
 
   const clearSelection = () => {
@@ -816,27 +842,23 @@ export default function CalendarManagement() {
       const allDatesSet = new Set<string>([...agodaDates, ...hyperguestDates]);
       const allDates = Array.from(allDatesSet);
 
-      // Prepare pricing updates for new bulk API
+      // Prepare pricing updates for new bulk API - unified rooms array
       const pricingPayload: Array<{
         date: string;
-        agoda_rooms: Array<{ agoda_room_id: string; price: number }>;
-        hyperguest_rooms: Array<{
-          room_type_code: string;
-          rate_plan_code: string;
-          price: number;
-        }>;
+        rooms: Array<
+          | { agoda_room_id: string; price: number }
+          | { room_type_code: string; rate_plan_code: string; price: number }
+        >;
       }> = [];
 
       allDates.forEach((date) => {
         const dateUpdate: {
           date: string;
-          agoda_rooms: Array<{ agoda_room_id: string; price: number }>;
-          hyperguest_rooms: Array<{
-            room_type_code: string;
-            rate_plan_code: string;
-            price: number;
-          }>;
-        } = { date, agoda_rooms: [], hyperguest_rooms: [] };
+          rooms: Array<
+            | { agoda_room_id: string; price: number }
+            | { room_type_code: string; rate_plan_code: string; price: number }
+          >;
+        } = { date, rooms: [] };
 
         // Collect price updates for both Agoda and HyperGuest
         Object.entries(priceEdits).forEach(([roomId, roomDates]) => {
@@ -848,17 +870,28 @@ export default function CalendarManagement() {
             const [room_type_code, rate_plan_code] = roomId.split("_");
 
             // Only send HyperGuest pricing when that room actually exists for this date
-            const hgDateCol = calendarData.hyperguest?.date_columns.find(
+            const hgDateCol = calendarData.hyperguest?.date_columns?.find(
               (col) => formatDate(col) === date
             );
             const hasRoomOnDate = hgDateCol?.room_inventory?.some(
-              (r) =>
-                r.room_type_code === room_type_code &&
-                (r.rate_plan_code || "CP") === (rate_plan_code || "CP")
+              (r) => {
+                // Check if room matches by room_type_code and rate_plan_code
+                if (r.room_type_code && r.rate_plan_code) {
+                  return (
+                    r.room_type_code === room_type_code &&
+                    (r.rate_plan_code || "CP") === (rate_plan_code || "CP")
+                  );
+                }
+                // Or check by hyperguest_room_id format: "Room-XX_RP"
+                if (r.hyperguest_room_id) {
+                  return r.hyperguest_room_id === roomId;
+                }
+                return false;
+              }
             );
 
             if (hasRoomOnDate) {
-              dateUpdate.hyperguest_rooms.push({
+              dateUpdate.rooms.push({
                 room_type_code,
                 rate_plan_code: rate_plan_code || "CP",
                 price: priceForDate,
@@ -866,17 +899,14 @@ export default function CalendarManagement() {
             }
           } else {
             // Agoda room: roomId is agoda_room_id
-            dateUpdate.agoda_rooms.push({
+            dateUpdate.rooms.push({
               agoda_room_id: roomId,
               price: priceForDate,
             });
           }
         });
 
-        if (
-          dateUpdate.agoda_rooms.length > 0 ||
-          dateUpdate.hyperguest_rooms.length > 0
-        ) {
+        if (dateUpdate.rooms.length > 0) {
           pricingPayload.push(dateUpdate);
         }
       });
@@ -884,13 +914,14 @@ export default function CalendarManagement() {
       // Send pricing updates if any
       if (pricingPayload.length > 0) {
         try {
-          // API expects: { pricing: [ { date, agoda_rooms, hyperguest_rooms } ] }
+          // API expects: { pricing: [ { date, rooms: [...] } ] }
           // {
           //   "pricing": [
           //     {
           //       "date": "2026-12-20",
-          //       "agoda_rooms": [{ "agoda_room_id": "1217830716", "price": 2200 }],
-          //       "hyperguest_rooms": [
+          //       "rooms": [
+          //         { "agoda_room_id": "847126877", "price": 100 },
+          //         { "agoda_room_id": "847126878", "price": 250 },
           //         { "room_type_code": "Room-02", "rate_plan_code": "CP", "price": 200 }
           //       ]
           //     }
@@ -915,9 +946,24 @@ export default function CalendarManagement() {
         }
       }
 
-      // Prepare availability updates (Agoda + HyperGuest)
-      const availabilityUpdates: Array<any> = [];
-      const updatesMap = new Map<string, any>();
+      // Prepare availability updates (Agoda + HyperGuest) - grouped by date
+      const availabilityUpdates: Array<{
+        agoda_room_id?: string;
+        room_type_code?: string;
+        rate_plan_code?: string;
+        date: string;
+        available_rooms?: number;
+        close_out?: boolean;
+        // closed: boolean;
+        // ctd: boolean;
+        // cta: boolean;
+      }> = [];
+      const updatesMap = new Map<string, {
+        roomId: string;
+        date: string;
+        available_rooms?: number;
+        close_out?: "Y" | "N";
+      }>();
 
       // Process inventory edits
       Object.entries(inventoryEdits).forEach(([roomId, dates]) => {
@@ -926,7 +972,7 @@ export default function CalendarManagement() {
           if (!updatesMap.has(key)) {
             updatesMap.set(key, { roomId, date, available_rooms });
           } else {
-            updatesMap.get(key).available_rooms = available_rooms;
+            updatesMap.get(key)!.available_rooms = available_rooms;
           }
         });
       });
@@ -938,12 +984,12 @@ export default function CalendarManagement() {
           if (!updatesMap.has(key)) {
             updatesMap.set(key, { roomId, date, close_out });
           } else {
-            updatesMap.get(key).close_out = close_out;
+            updatesMap.get(key)!.close_out = close_out;
           }
         });
       });
 
-      // Build availability updates array
+      // Build availability updates array - similar structure to pricing
       updatesMap.forEach((update) => {
         const { roomId, date, available_rooms, close_out } = update;
 
@@ -954,17 +1000,37 @@ export default function CalendarManagement() {
           const room_type_code = roomParts.join("_");
 
           // Only send HyperGuest availability when that room actually exists for this date
-          const hgDateCol = calendarData.hyperguest?.date_columns.find(
+          const hgDateCol = calendarData.hyperguest?.date_columns?.find(
             (col) => formatDate(col) === date
           );
           const hasRoomOnDate = hgDateCol?.room_inventory?.some(
-            (r) =>
-              r.room_type_code === room_type_code &&
-              (r.rate_plan_code || "CP") === (rate_plan_code || "CP")
+            (r) => {
+              // Check if room matches by room_type_code and rate_plan_code
+              if (r.room_type_code && r.rate_plan_code) {
+                return (
+                  r.room_type_code === room_type_code &&
+                  (r.rate_plan_code || "CP") === (rate_plan_code || "CP")
+                );
+              }
+              // Or check by hyperguest_room_id format: "Room-XX_RP"
+              if (r.hyperguest_room_id) {
+                return r.hyperguest_room_id === roomId;
+              }
+              return false;
+            }
           );
 
           if (hasRoomOnDate) {
-            const updatePayload: any = {
+            const updatePayload: {
+              room_type_code: string;
+              rate_plan_code: string;
+              date: string;
+              available_rooms?: number;
+              close_out?: boolean;
+              closed: boolean;
+              ctd: boolean;
+              cta: boolean;
+            } = {
               room_type_code,
               rate_plan_code: rate_plan_code || "CP",
               date,
@@ -976,24 +1042,34 @@ export default function CalendarManagement() {
               updatePayload.available_rooms = available_rooms;
             }
             if (close_out !== undefined) {
-              updatePayload.close_out = close_out;
+              // Convert "Y" to true, "N" to false
+              updatePayload.close_out = close_out === "Y";
             }
             availabilityUpdates.push(updatePayload);
           }
         } else {
           // Agoda room
-          const updatePayload: any = {
+          const updatePayload: {
+            agoda_room_id: string;
+            date: string;
+            available_rooms?: number;
+            close_out?: boolean;
+            // closed: boolean;
+            // ctd: boolean;
+            // cta: boolean;
+          } = {
             agoda_room_id: roomId,
             date,
-            closed: false,
-            ctd: false,
-            cta: false,
+            // closed: false,
+            // ctd: false,
+            // cta: false,
           };
           if (available_rooms !== undefined) {
             updatePayload.available_rooms = available_rooms;
           }
           if (close_out !== undefined) {
-            updatePayload.close_out = close_out;
+            // Convert "Y" to true, "N" to false
+            updatePayload.close_out = close_out === "Y";
           }
           availabilityUpdates.push(updatePayload);
         }
@@ -1292,40 +1368,97 @@ export default function CalendarManagement() {
           }}
           size="lg"
         >
-          <div className="mb-4 p-3 bg-gray-50 rounded-lg border border-gray-200">
-            <p className="text-sm font-semibold text-gray-800">
-              {`${formatDate(tempStartDate)} → ${formatDate(tempEndDate)}`}
-            </p>
-          </div>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
               <p className="text-sm font-medium text-gray-700 mb-2">
                 Start Date
               </p>
-              <DatePicker
-                selected={tempStartDate}
-                onChange={(date: Date | null) => {
-                  if (date) {
-                    setTempStartDate(date);
-                    if (tempEndDate < date) setTempEndDate(date);
-                  }
-                }}
-                selectsStart
-                startDate={tempStartDate}
-                inline
-                minDate={new Date()}
-              />
+              <div className="mb-3">
+                <Input
+                  type="date"
+                  value={formatDate(tempStartDate)}
+                  onChange={(e) => {
+                    const dateValue = e.target.value;
+                    if (dateValue) {
+                      const newDate = new Date(dateValue);
+                      if (!isNaN(newDate.getTime())) {
+                        setTempStartDate(newDate);
+                        if (tempEndDate < newDate) {
+                          setTempEndDate(newDate);
+                        }
+                      }
+                    }
+                  }}
+                  onFocus={(e) => {
+                    // Prevent native calendar from opening
+                    e.target.showPicker = () => {};
+                  }}
+                  onClick={(e) => {
+                    // Prevent native calendar from opening
+                    (e.target as HTMLInputElement).showPicker = () => {};
+                  }}
+                  className="w-full"
+                />
+              </div>
+              <div className="w-full">
+                <DatePicker
+                  selected={tempStartDate}
+                  className="w-full"
+                  onChange={(date: Date | null) => {
+                    if (date) {
+                      setTempStartDate(date);
+                      if (tempEndDate < date) setTempEndDate(date);
+                    }
+                  }}
+                  selectsStart
+                  startDate={tempStartDate}
+                  inline
+                  minDate={new Date()}
+                />
+              </div>
             </div>
             <div>
               <p className="text-sm font-medium text-gray-700 mb-2">End Date</p>
-              <DatePicker
-                selected={tempEndDate}
-                onChange={(date: Date | null) => date && setTempEndDate(date)}
-                selectsEnd
-                endDate={tempEndDate}
-                minDate={tempStartDate}
-                inline
-              />
+              <div className="mb-3">
+                <Input
+                  type="date"
+                  value={formatDate(tempEndDate)}
+                  onChange={(e) => {
+                    const dateValue = e.target.value;
+                    if (dateValue) {
+                      const newDate = new Date(dateValue);
+                      if (!isNaN(newDate.getTime())) {
+                        if (newDate >= tempStartDate) {
+                          setTempEndDate(newDate);
+                        } else {
+                          toast.error("End date cannot be before start date.");
+                        }
+                      }
+                    }
+                  }}
+                  onFocus={(e) => {
+                    // Prevent native calendar from opening
+                    e.target.showPicker = () => {};
+                  }}
+                  onClick={(e) => {
+                    // Prevent native calendar from opening
+                    (e.target as HTMLInputElement).showPicker = () => {};
+                  }}
+                  className="w-full"
+                  min={formatDate(tempStartDate)}
+                />
+              </div>
+              <div className="w-full">
+                <DatePicker
+                  selected={tempEndDate}
+                  className="w-full"
+                  onChange={(date: Date | null) => date && setTempEndDate(date)}
+                  selectsEnd
+                  endDate={tempEndDate}
+                  minDate={tempStartDate}
+                  inline
+                />
+              </div>
             </div>
           </div>
         </Modal>
@@ -1629,10 +1762,9 @@ export default function CalendarManagement() {
                     );
 
                     return (
-                      <tr
-                        key={`${room.room_id}-${roomIndex}`}
-                        className="hover:bg-gray-50"
-                      >
+                      <React.Fragment key={`${room.room_id}-${roomIndex}`}>
+                        {/* Agoda Room Row */}
+                        <tr className="hover:bg-gray-50">
                         <td className="px-4 py-2 whitespace-nowrap text-sm font-medium text-gray-900 sticky left-0 bg-white z-10">
                           <div className="flex gap-4 items-center justify-between">
                             <div className="flex items-center gap-2">
@@ -1645,9 +1777,7 @@ export default function CalendarManagement() {
                               ></div> */}
                               <div className="flex-1">
                                 <div className="text-xs text-gray-500 mb-1">
-                                  {room.ota === "agoda"
-                                    ? `Agoda: ${room.room_id}`
-                                    : `HG: ${room.room_id}`}
+                                  Agoda: {room.room_id}
                                 </div>
                                 <div className="text-xs font-medium max-w-[200px] whitespace-pre-line overflow-hidden text-ellipsis line-clamp-2 break-words">
                                   {room.room_name}
@@ -1663,6 +1793,26 @@ export default function CalendarManagement() {
                                       <span className="px-1.5 bg-indigo-100 text-indigo-800 rounded-md">
                                       ₹{room.room_data.price}
                                     </span>
+                                  )}
+                                </div>
+                                
+                                {/* HyperGuest Rooms Info */}
+                                <div className="mt-2 pt-2 border-t border-gray-200">
+                                  {room.hyperguest_rooms && room.hyperguest_rooms.length > 0 ? (
+                                    <div className="space-y-1">
+                                      {room.hyperguest_rooms.map((hgRoom) => (
+                                        <div 
+                                          key={hgRoom.room_id} 
+                                          className="text-[10px] text-gray-600 max-w-[200px] whitespace-normal break-words"
+                                        >
+                                          <span className="font-medium">HG:</span> {hgRoom.room_id} - {hgRoom.room_name}
+                                        </div>
+                                      ))}
+                                    </div>
+                                  ) : (
+                                    <div className="text-[10px] text-gray-400 italic">
+                                      No HG rooms configured
+                                    </div>
                                   )}
                                 </div>
                               </div>
@@ -1742,18 +1892,27 @@ export default function CalendarManagement() {
 
                           if (room.ota === "hyperguest") {
                             const hgDateCol =
-                              calendarData.hyperguest.date_columns.find(
+                              calendarData.hyperguest?.date_columns?.find(
                                 (col) => formatDate(col) === date
                               );
                             if (hgDateCol && hgDateCol.room_inventory) {
-                              const [room_type_code, rate_plan_code] =
-                                room.room_id.split("_");
-                              const hgRoom = hgDateCol.room_inventory.find(
-                                (r) =>
-                                  r.room_type_code === room_type_code &&
-                                  (r.rate_plan_code || "CP") ===
-                                    (rate_plan_code || "CP")
+                              // Try to find by hyperguest_room_id first (most reliable)
+                              let hgRoom = hgDateCol.room_inventory.find(
+                                (r) => r.hyperguest_room_id === room.room_id
                               );
+                              
+                              // If not found, try by room_type_code and rate_plan_code
+                              if (!hgRoom) {
+                                const [room_type_code, rate_plan_code] =
+                                  room.room_id.split("_");
+                                hgRoom = hgDateCol.room_inventory.find(
+                                  (r) =>
+                                    r.room_type_code === room_type_code &&
+                                    (r.rate_plan_code || "CP") ===
+                                      (rate_plan_code || "CP")
+                                );
+                              }
+                              
                               currentPrice = hgRoom?.price ?? 0;
                               currentAvail = hgRoom?.availability ?? 0;
                               currentCloseOut = (hgRoom?.close_out as "Y" | "N") ?? "N";
@@ -1964,6 +2123,7 @@ export default function CalendarManagement() {
                           );
                         })}
                       </tr>
+                    </React.Fragment>
                     );
                   })}
                 </tbody>

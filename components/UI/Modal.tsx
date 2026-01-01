@@ -77,7 +77,7 @@ const Modal: React.FC<ModalProps> = ({
                 Cancel
               </Button>
               <Button
-                variant={'primary'}
+                variant={danger ? 'danger' : 'primary'}
                 onClick={onPrimaryAction}
                 isLoading={isLoading}
               >
