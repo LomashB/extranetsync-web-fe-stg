@@ -1368,99 +1368,110 @@ export default function CalendarManagement() {
           }}
           size="lg"
         >
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <p className="text-sm font-medium text-gray-700 mb-2">
-                Start Date
-              </p>
-              <div className="mb-3">
-                <Input
-                  type="date"
-                  value={formatDate(tempStartDate)}
-                  onChange={(e) => {
-                    const dateValue = e.target.value;
-                    if (dateValue) {
-                      const newDate = new Date(dateValue);
-                      if (!isNaN(newDate.getTime())) {
-                        setTempStartDate(newDate);
-                        if (tempEndDate < newDate) {
-                          setTempEndDate(newDate);
+          <>
+            <style dangerouslySetInnerHTML={{
+              __html: `
+                .date-picker-calendar .react-datepicker__day--outside-month,
+                .date-picker-calendar .react-datepicker__day--outside-month:hover {
+                  visibility: hidden !important;
+                  pointer-events: none;
+                }
+              `
+            }} />
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <p className="text-sm font-medium text-gray-700 mb-2">
+                  Start Date
+                </p>
+                <div className="mb-3">
+                  <Input
+                    type="date"
+                    value={formatDate(tempStartDate)}
+                    onChange={(e) => {
+                      const dateValue = e.target.value;
+                      if (dateValue) {
+                        const newDate = new Date(dateValue);
+                        if (!isNaN(newDate.getTime())) {
+                          setTempStartDate(newDate);
+                          if (tempEndDate < newDate) {
+                            setTempEndDate(newDate);
+                          }
                         }
                       }
-                    }
-                  }}
-                  onFocus={(e) => {
-                    // Prevent native calendar from opening
-                    e.target.showPicker = () => {};
-                  }}
-                  onClick={(e) => {
-                    // Prevent native calendar from opening
-                    (e.target as HTMLInputElement).showPicker = () => {};
-                  }}
-                  className="w-full"
-                />
+                    }}
+                    onFocus={(e) => {
+                      // Prevent native calendar from opening
+                      e.target.showPicker = () => {};
+                    }}
+                    onClick={(e) => {
+                      // Prevent native calendar from opening
+                      (e.target as HTMLInputElement).showPicker = () => {};
+                    }}
+                    className="w-full"
+                  />
+                </div>
+                <div className="w-full date-picker-calendar">
+                  <DatePicker
+                    selected={tempStartDate}
+                    className="w-full"
+                    onChange={(date: Date | null) => {
+                      if (date) {
+                        setTempStartDate(date);
+                        if (tempEndDate < date) setTempEndDate(date);
+                      }
+                    }}
+                    selectsStart
+                    startDate={tempStartDate}
+                    inline
+                    minDate={new Date()}
+                  />
+                </div>
               </div>
-              <div className="w-full">
-                <DatePicker
-                  selected={tempStartDate}
-                  className="w-full"
-                  onChange={(date: Date | null) => {
-                    if (date) {
-                      setTempStartDate(date);
-                      if (tempEndDate < date) setTempEndDate(date);
-                    }
-                  }}
-                  selectsStart
-                  startDate={tempStartDate}
-                  inline
-                  minDate={new Date()}
-                />
-              </div>
-            </div>
-            <div>
-              <p className="text-sm font-medium text-gray-700 mb-2">End Date</p>
-              <div className="mb-3">
-                <Input
-                  type="date"
-                  value={formatDate(tempEndDate)}
-                  onChange={(e) => {
-                    const dateValue = e.target.value;
-                    if (dateValue) {
-                      const newDate = new Date(dateValue);
-                      if (!isNaN(newDate.getTime())) {
-                        if (newDate >= tempStartDate) {
-                          setTempEndDate(newDate);
-                        } else {
-                          toast.error("End date cannot be before start date.");
+              <div>
+                <p className="text-sm font-medium text-gray-700 mb-2">End Date</p>
+                <div className="mb-3">
+                  <Input
+                    type="date"
+                    value={formatDate(tempEndDate)}
+                    onChange={(e) => {
+                      const dateValue = e.target.value;
+                      if (dateValue) {
+                        const newDate = new Date(dateValue);
+                        if (!isNaN(newDate.getTime())) {
+                          if (newDate >= tempStartDate) {
+                            setTempEndDate(newDate);
+                          } else {
+                            toast.error("End date cannot be before start date.");
+                          }
                         }
                       }
-                    }
-                  }}
-                  onFocus={(e) => {
-                    // Prevent native calendar from opening
-                    e.target.showPicker = () => {};
-                  }}
-                  onClick={(e) => {
-                    // Prevent native calendar from opening
-                    (e.target as HTMLInputElement).showPicker = () => {};
-                  }}
-                  className="w-full"
-                  min={formatDate(tempStartDate)}
-                />
-              </div>
-              <div className="w-full">
-                <DatePicker
-                  selected={tempEndDate}
-                  className="w-full"
-                  onChange={(date: Date | null) => date && setTempEndDate(date)}
-                  selectsEnd
-                  endDate={tempEndDate}
-                  minDate={tempStartDate}
-                  inline
-                />
+                    }}
+                    onFocus={(e) => {
+                      // Prevent native calendar from opening
+                      e.target.showPicker = () => {};
+                    }}
+                    onClick={(e) => {
+                      // Prevent native calendar from opening
+                      (e.target as HTMLInputElement).showPicker = () => {};
+                    }}
+                    className="w-full"
+                    min={formatDate(tempStartDate)}
+                  />
+                </div>
+                <div className="w-full date-picker-calendar">
+                  <DatePicker
+                    selected={tempEndDate}
+                    className="w-full"
+                    onChange={(date: Date | null) => date && setTempEndDate(date)}
+                    selectsEnd
+                    endDate={tempEndDate}
+                    minDate={tempStartDate}
+                    inline
+                  />
+                </div>
               </div>
             </div>
-          </div>
+          </>
         </Modal>
 
         {/* ──────────────────────────────────────────────────────── */}
