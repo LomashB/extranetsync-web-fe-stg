@@ -207,6 +207,7 @@ export default function PropertyManagement() {
   // Loading states
   const [isProcessing, setIsProcessing] = useState(false);
   const [processingMessage, setProcessingMessage] = useState('');
+  const [agodaRoomMappingsCreated, setAgodaRoomMappingsCreated] = useState(false);
 
   // ──────────────────────────────────────────────────────────────
   // • Effects
@@ -281,6 +282,37 @@ export default function PropertyManagement() {
         setAgodaProperty(details.property);
         setAgodaDetails(details);
         setAgodaPercentage(details.property.extra_guest_percentage || 0);
+
+        // Auto-create Agoda room mappings in bulk once we have Agoda room details
+        // This mirrors the mapping behavior in `app/admin/room-mapping/page.tsx`
+        try {
+          if (!agodaRoomMappingsCreated) {
+            const rooms = Array.isArray(details?.rooms) ? details.rooms : [];
+            const roomIds = rooms
+              .map((r: any) => r?.agoda_room_id)
+              .filter(Boolean) as string[];
+
+            const uniqueRoomIds = Array.from(new Set(roomIds));
+
+            if (uniqueRoomIds.length > 0) {
+              setProcessingMessage('Creating Agoda room mappings...');
+              await axios.post(`admin/properties/${propertyId}/room-mappings/bulk`, {
+                mappings: uniqueRoomIds.map((agoda_room_id) => ({ agoda_room_id })),
+              });
+              setAgodaRoomMappingsCreated(true);
+              toast.success('Agoda room mappings created successfully');
+            }
+          }
+        } catch (mappingError: any) {
+          // Non-blocking: property details are still usable even if mapping creation fails
+          console.error('Error creating Agoda room mappings:', mappingError);
+          const msg =
+            mappingError.response?.data?.MESSAGE ||
+            mappingError.response?.data?.message ||
+            'Failed to create Agoda room mappings';
+          toast.error(msg);
+        }
+
         return details;
       } else {
         throw new Error(response.data.MESSAGE || 'Failed to get Agoda property details');
@@ -588,6 +620,7 @@ export default function PropertyManagement() {
     setHyperguestCurrencyExists(false);
     setIsProcessing(false);
     setProcessingMessage('');
+    setAgodaRoomMappingsCreated(false);
   };
 
   const resetViewModals = () => {
@@ -618,6 +651,7 @@ export default function PropertyManagement() {
   // Edit property function
   const handleEditProperty = (property: Property) => {
     setIsEditMode(true);
+    setAgodaRoomMappingsCreated(false);
     setPropertyForm({
       agoda_property_id: property.property_id,
       hyperguest_property_id: property.hyperguest_property_code || ''
@@ -810,7 +844,10 @@ export default function PropertyManagement() {
           <Button
             variant="primary"
             leftIcon={<Plus size={16} />}
-            onClick={() => setIsSetupModalOpen(true)}
+            onClick={() => {
+              setAgodaRoomMappingsCreated(false);
+              setIsSetupModalOpen(true);
+            }}
             className="flex-shrink-0"
           >
             Add Property
